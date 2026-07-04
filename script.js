@@ -1,91 +1,53 @@
 /* =============================================
-   SMART HOME - APPLICATION COMPLÈTE v2.0
-   Caméras fonctionnelles (téléphone + IP)
+   SMART HOME PRO - APPLICATION PRINCIPALE
    ============================================= */
 
 class SmartHomeApp {
     constructor() {
-        // ========== CONFIGURATION ==========
-        this.HOME_LATITUDE = 48.8566;    // ← REMPLACEZ PAR VOTRE LATITUDE
-        this.HOME_LONGITUDE = 2.3522;    // ← REMPLACEZ PAR VOTRE LONGITUDE
-        this.PROXIMITY_RADIUS = 2;       // 2 mètres
+        this.HOME_LATITUDE = 48.8566;
+        this.HOME_LONGITUDE = 2.3522;
+        this.PROXIMITY_RADIUS = 2;
         this.VALID_USERNAME = 'admin';
         this.VALID_PASSWORD = 'admin123';
 
-        // ========== ÉTAT DE L'APPLICATION ==========
         this.isLoggedIn = false;
         this.currentUser = null;
         this.isInProximity = false;
         this.geoWatchId = null;
         this.currentConfigCameraId = null;
-        this.activeStreams = new Map(); // Pour tracker les flux actifs
+        this.recordingTimers = {};
 
-        // ========== APPAREILS PAR DÉFAUT ==========
         this.devices = [
-            { 
-                id: 'door-1', name: 'Porte Principale', type: 'door', 
-                room: 'Entrée', status: 'closed', icon: 'fa-door-closed' 
-            },
-            { 
-                id: 'door-2', name: 'Porte Arrière', type: 'door', 
-                room: 'Cuisine', status: 'closed', icon: 'fa-door-closed' 
-            },
-            { 
-                id: 'window-1', name: 'Fenêtre Salon', type: 'window', 
-                room: 'Salon', status: 'closed', icon: 'fa-window-maximize' 
-            },
-            { 
-                id: 'window-2', name: 'Fenêtre Chambre', type: 'window', 
-                room: 'Chambre', status: 'closed', icon: 'fa-window-maximize' 
-            },
-            { 
-                id: 'light-1', name: 'Plafond Salon', type: 'light', 
-                room: 'Salon', status: 'off', icon: 'fa-lightbulb' 
-            },
-            { 
-                id: 'light-2', name: 'Lampe Cuisine', type: 'light', 
-                room: 'Cuisine', status: 'off', icon: 'fa-lightbulb' 
-            },
-            { 
-                id: 'light-3', name: 'Lumière Chambre', type: 'light', 
-                room: 'Chambre', status: 'off', icon: 'fa-lightbulb' 
-            },
-            { 
-                id: 'camera-1', name: 'Caméra Entrée', type: 'camera', 
-                room: 'Entrée', status: 'online', icon: 'fa-video',
-                cameraUrl: null, streamType: null // 'local' ou 'remote'
-            },
-            { 
-                id: 'camera-2', name: 'Caméra Jardin', type: 'camera', 
-                room: 'Jardin', status: 'online', icon: 'fa-video',
-                cameraUrl: null, streamType: null
-            },
+            { id: 'door-1', name: 'Porte Principale', type: 'door', room: 'Entrée', status: 'closed', icon: 'fa-door-closed' },
+            { id: 'door-2', name: 'Porte Arrière', type: 'door', room: 'Cuisine', status: 'closed', icon: 'fa-door-closed' },
+            { id: 'window-1', name: 'Fenêtre Salon', type: 'window', room: 'Salon', status: 'closed', icon: 'fa-window-maximize' },
+            { id: 'window-2', name: 'Fenêtre Chambre', type: 'window', room: 'Chambre', status: 'closed', icon: 'fa-window-maximize' },
+            { id: 'light-1', name: 'Plafond Salon', type: 'light', room: 'Salon', status: 'off', icon: 'fa-lightbulb' },
+            { id: 'light-2', name: 'Lampe Cuisine', type: 'light', room: 'Cuisine', status: 'off', icon: 'fa-lightbulb' },
+            { id: 'light-3', name: 'Lumière Chambre', type: 'light', room: 'Chambre', status: 'off', icon: 'fa-lightbulb' },
+            { id: 'camera-1', name: 'Caméra Entrée', type: 'camera', room: 'Entrée', status: 'online', icon: 'fa-video', cameraUrl: null, streamType: null, localStream: null, captures: [], motionDetection: false, motionInterval: null },
+            { id: 'camera-2', name: 'Caméra Jardin', type: 'camera', room: 'Jardin', status: 'online', icon: 'fa-video', cameraUrl: null, streamType: null, localStream: null, captures: [], motionDetection: false, motionInterval: null },
         ];
 
         this.notifications = [];
         this.activityLog = [];
-
-        // ========== DÉMARRAGE ==========
         this.init();
     }
 
-    /* ==================== INITIALISATION ==================== */
     init() {
-        console.log('🏠 Smart Home - Initialisation...');
+        console.log('🏠 Smart Home Pro - Initialisation...');
         this.loadData();
         this.setupEventListeners();
-        
         if (this.isLoggedIn && this.currentUser) {
             this.showDashboard();
             this.startProximityCheck();
         }
-        
-        console.log('✅ Prêt. Appareils:', this.devices.length);
+        this.cleanupOldData();
     }
 
     loadData() {
         try {
-            const saved = localStorage.getItem('smartHomeDataV2');
+            const saved = localStorage.getItem('smartHomeProData');
             if (saved) {
                 const data = JSON.parse(saved);
                 this.devices = data.devices || this.devices;
@@ -93,126 +55,65 @@ class SmartHomeApp {
                 this.activityLog = data.activityLog || [];
                 this.isLoggedIn = data.isLoggedIn || false;
                 this.currentUser = data.currentUser || null;
-                
-                // Nettoyer les streams (ne peuvent pas être sérialisés)
-                this.devices.forEach(d => {
-                    d.localStream = null;
-                    if (d.type === 'camera' && d.status === 'recording') {
-                        d.status = 'online';
-                    }
-                });
+                this.devices.forEach(d => { d.localStream = null; d.motionInterval = null; if (d.type === 'camera' && d.status === 'recording') d.status = 'online'; });
             }
-        } catch (e) {
-            console.error('❌ Erreur chargement:', e);
-        }
+        } catch (e) { console.error('❌ Erreur chargement:', e); }
     }
 
     saveData() {
         try {
-            // Créer une copie sans les streams (non sérialisables)
             const devicesCopy = this.devices.map(d => {
-                const { localStream, ...rest } = d;
+                const { localStream, motionInterval, ...rest } = d;
                 return rest;
             });
-
-            const data = {
+            localStorage.setItem('smartHomeProData', JSON.stringify({
                 devices: devicesCopy,
                 notifications: this.notifications,
                 activityLog: this.activityLog,
                 isLoggedIn: this.isLoggedIn,
                 currentUser: this.currentUser
-            };
-            localStorage.setItem('smartHomeDataV2', JSON.stringify(data));
-        } catch (e) {
-            console.error('❌ Erreur sauvegarde:', e);
-        }
+            }));
+        } catch (e) { console.error('❌ Erreur sauvegarde:', e); }
+    }
+
+    async cleanupOldData() {
+        try { await videoRecorder.cleanupOldRecordings(20); } catch (e) {}
     }
 
     setupEventListeners() {
-        // Login
         const loginForm = document.getElementById('login-form');
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.login();
-            });
-        }
-
-        // Onglets
+        if (loginForm) loginForm.addEventListener('submit', (e) => { e.preventDefault(); this.login(); });
         document.querySelectorAll('.tab-button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.switchTab(btn.dataset.tab);
-            });
+            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
         });
-
-        // Overlay du panneau notifications
         const overlay = document.getElementById('panel-overlay');
-        if (overlay) {
-            overlay.addEventListener('click', () => this.toggleNotificationPanel());
-        }
-
-        // Fermer modals en cliquant dehors
+        if (overlay) overlay.addEventListener('click', () => this.toggleNotificationPanel());
         document.querySelectorAll('.modal-overlay').forEach(overlay => {
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    this.closeAddDeviceModal();
-                    this.closeConfigCameraModal();
-                }
-            });
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) { this.closeAddDeviceModal(); this.closeConfigCameraModal(); } });
         });
-
-        // Raccourcis clavier
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this.closeAddDeviceModal();
-                this.closeConfigCameraModal();
-                if (document.getElementById('notification-panel')?.classList.contains('active')) {
-                    this.toggleNotificationPanel();
-                }
-            }
-            if (e.ctrlKey && e.key === 'p') {
-                e.preventDefault();
-                this.simulateProximity();
-            }
+            if (e.key === 'Escape') { this.closeAddDeviceModal(); this.closeConfigCameraModal(); if (document.getElementById('notification-panel')?.classList.contains('active')) this.toggleNotificationPanel(); }
+            if (e.ctrlKey && e.key === 'p') { e.preventDefault(); this.simulateProximity(); }
         });
-
-        // Nettoyer les flux en quittant la page
-        window.addEventListener('beforeunload', () => {
-            this.stopAllCameraStreams();
-        });
-
-        // Gérer la visibilité de la page
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                // Page cachée : on garde les flux mais on log
-                console.log('📱 Page en arrière-plan');
-            } else {
-                // Page visible : rafraîchir les flux
-                console.log('📱 Page visible - rafraîchissement flux');
-                this.refreshAllVideoStreams();
-            }
-        });
+        window.addEventListener('beforeunload', () => this.cleanup());
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) this.refreshAllVideoStreams(); });
     }
 
-    /* ==================== AUTHENTIFICATION ==================== */
+    cleanup() {
+        this.stopAllCameraStreams();
+        Object.keys(this.recordingTimers).forEach(id => clearInterval(this.recordingTimers[id]));
+        this.devices.forEach(d => { if (d.motionInterval) clearInterval(d.motionInterval); });
+    }
+
+    /* ==================== AUTH ==================== */
     login() {
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value.trim();
         const errorEl = document.getElementById('login-error');
-
-        if (!username || !password) {
-            this.showLoginError('Veuillez remplir tous les champs');
-            return;
-        }
-
+        if (!username || !password) { this.showLoginError('Champs requis'); return; }
         if (username === this.VALID_USERNAME && password === this.VALID_PASSWORD) {
             this.isLoggedIn = true;
-            this.currentUser = {
-                username: username,
-                initial: username.charAt(0).toUpperCase(),
-                loginTime: new Date().toISOString()
-            };
-
+            this.currentUser = { username, initial: username.charAt(0).toUpperCase(), loginTime: new Date().toISOString() };
             errorEl.classList.remove('show');
             this.saveData();
             this.showDashboard();
@@ -220,968 +121,439 @@ class SmartHomeApp {
             this.addActivity('Connexion réussie', 'login', '🔑');
             this.showToast('Bienvenue ' + username + ' ! 🏠', 'success');
         } else {
-            this.showLoginError('Nom d\'utilisateur ou mot de passe incorrect');
+            this.showLoginError('Identifiants incorrects');
         }
     }
 
-    showLoginError(message) {
-        const errorEl = document.getElementById('login-error');
-        if (errorEl) {
-            errorEl.textContent = message;
-            errorEl.classList.add('show');
-            setTimeout(() => errorEl.classList.remove('show'), 3000);
-        }
+    showLoginError(msg) {
+        const el = document.getElementById('login-error');
+        if (el) { el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 3000); }
     }
 
     logout() {
-        // Arrêter TOUS les flux vidéo
-        this.stopAllCameraStreams();
-        
+        this.cleanup();
         this.isLoggedIn = false;
         this.currentUser = null;
         this.stopProximityCheck();
-
         document.getElementById('dashboard-screen').classList.remove('active');
         document.getElementById('login-screen').classList.add('active');
-
         document.getElementById('login-username').value = '';
         document.getElementById('login-password').value = '';
-
         this.saveData();
     }
 
     showDashboard() {
         document.getElementById('login-screen').classList.remove('active');
         document.getElementById('dashboard-screen').classList.add('active');
-
         document.getElementById('user-avatar').textContent = this.currentUser.initial;
         document.getElementById('user-name').textContent = this.currentUser.username;
-
         this.updateConnectionUI();
         this.switchTab('dashboard');
         this.renderAll();
     }
 
-    /* ==================== PROXIMITÉ GPS ==================== */
+    /* ==================== PROXIMITÉ ==================== */
     startProximityCheck() {
-        if (!navigator.geolocation) {
-            this.isInProximity = false;
-            this.updateConnectionUI();
-            return;
-        }
-
+        if (!navigator.geolocation) { this.isInProximity = false; this.updateConnectionUI(); return; }
         this.geoWatchId = navigator.geolocation.watchPosition(
-            (position) => this.handlePositionUpdate(position),
-            (error) => this.handleGeoError(error),
-            {
-                enableHighAccuracy: true,
-                maximumAge: 3000,
-                timeout: 10000
-            }
+            (p) => this.handlePositionUpdate(p),
+            (e) => this.handleGeoError(e),
+            { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
         );
     }
 
-    handlePositionUpdate(position) {
-        const distance = this.calculateDistance(
-            position.coords.latitude,
-            position.coords.longitude,
-            this.HOME_LATITUDE,
-            this.HOME_LONGITUDE
-        );
-
-        const wasInProximity = this.isInProximity;
-        this.isInProximity = distance <= this.PROXIMITY_RADIUS;
-
-        if (wasInProximity !== this.isInProximity) {
-            this.updateConnectionUI();
-            this.renderAll();
-
-            if (this.isInProximity) {
-                this.addNotification('📍 Vous êtes à proximité - Accès complet', 'info');
-                this.addActivity('Entré dans la zone de proximité', 'location', '📍');
-            } else {
-                this.addNotification('📍 Vous êtes trop loin - Accès restreint', 'warning');
-                this.addActivity('Sorti de la zone de proximité', 'location', '📍');
-            }
-        }
-
-        const distanceText = document.getElementById('distance-text');
-        if (distanceText) {
-            const distFormatted = distance < 1 ? 
-                `${(distance * 100).toFixed(0)} cm` : 
-                `${distance.toFixed(1)} m`;
-            distanceText.textContent = ` (${distFormatted})`;
-        }
+    handlePositionUpdate(pos) {
+        const d = this.calculateDistance(pos.coords.latitude, pos.coords.longitude, this.HOME_LATITUDE, this.HOME_LONGITUDE);
+        const was = this.isInProximity;
+        this.isInProximity = d <= this.PROXIMITY_RADIUS;
+        if (was !== this.isInProximity) { this.updateConnectionUI(); this.renderAll(); }
+        const dt = document.getElementById('distance-text');
+        if (dt) dt.textContent = ` (${d < 1 ? (d*100).toFixed(0)+' cm' : d.toFixed(1)+' m'})`;
     }
 
-    handleGeoError(error) {
-        console.warn('⚠️ Géolocalisation:', error.message);
-        this.isInProximity = false;
-        this.updateConnectionUI();
-        this.renderAll();
-    }
+    handleGeoError(e) { this.isInProximity = false; this.updateConnectionUI(); this.renderAll(); }
+    stopProximityCheck() { if (this.geoWatchId !== null) { navigator.geolocation.clearWatch(this.geoWatchId); this.geoWatchId = null; } this.isInProximity = false; this.updateConnectionUI(); }
+    calculateDistance(lat1, lon1, lat2, lon2) { const R=6371000, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180, a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
+    simulateProximity() { this.isInProximity=!this.isInProximity; this.updateConnectionUI(); this.renderAll(); this.showToast(this.isInProximity?'📍 Proximité simulée ACTIVÉE':'📍 Proximité simulée DÉSACTIVÉE',this.isInProximity?'success':'warning'); }
 
-    stopProximityCheck() {
-        if (this.geoWatchId !== null) {
-            navigator.geolocation.clearWatch(this.geoWatchId);
-            this.geoWatchId = null;
-        }
-        this.isInProximity = false;
-        this.updateConnectionUI();
-    }
-
-    calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371000;
-        const dLat = this.toRad(lat2 - lat1);
-        const dLon = this.toRad(lon2 - lon1);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    toRad(degrees) {
-        return degrees * Math.PI / 180;
-    }
-
-    simulateProximity() {
-        this.isInProximity = !this.isInProximity;
-        this.updateConnectionUI();
-        this.renderAll();
-
-        const msg = this.isInProximity ? 
-            '📍 Proximité simulée ACTIVÉE' : 
-            '📍 Proximité simulée DÉSACTIVÉE';
-        this.showToast(msg, this.isInProximity ? 'success' : 'warning');
-    }
-
-    /* ==================== CONTRÔLE DES APPAREILS ==================== */
-    canControl() {
-        if (!this.isInProximity) {
-            this.showToast('❌ Vous devez être à moins de 2 mètres', 'error');
-            return false;
-        }
-        return true;
-    }
-
+    /* ==================== CONTRÔLE APPAREILS ==================== */
+    canControl() { if(!this.isInProximity){this.showToast('❌ Vous devez être à moins de 2 mètres','error');return false;} return true; }
+    
     toggleDevice(deviceId) {
-        if (!this.canControl()) return;
-
-        const device = this.devices.find(d => d.id === deviceId);
-        if (!device || device.type === 'camera') return;
-
-        switch(device.type) {
-            case 'door':
-            case 'window':
-                device.status = device.status === 'open' ? 'closed' : 'open';
-                break;
-            case 'light':
-                device.status = device.status === 'on' ? 'off' : 'on';
-                break;
-        }
-
-        const actionText = this.getActionText(device);
-        const emoji = this.getDeviceEmoji(device.type);
-        
-        this.addNotification(`${emoji} ${device.name} ${actionText}`, 'info');
-        this.addActivity(`${device.name} ${actionText}`, device.type, emoji);
-        this.showToast(`${device.name} ${actionText}`, 'success');
-        
-        this.saveData();
-        this.renderAll();
+        if(!this.canControl())return;
+        const d=this.devices.find(x=>x.id===deviceId);
+        if(!d||d.type==='camera')return;
+        if(d.type==='door'||d.type==='window')d.status=d.status==='open'?'closed':'open';
+        else if(d.type==='light')d.status=d.status==='on'?'off':'on';
+        const t=this.getActionText(d),e=this.getDeviceEmoji(d.type);
+        this.addNotification(`${e} ${d.name} ${t}`,'info');
+        this.addActivity(`${d.name} ${t}`,d.type,e);
+        this.showToast(`${d.name} ${t}`,'success');
+        this.saveData(); this.renderAll();
     }
 
     toggleAllLights() {
-        if (!this.canControl()) return;
-
-        const lights = this.devices.filter(d => d.type === 'light');
-        if (lights.length === 0) {
-            this.showToast('Aucune lumière à contrôler', 'info');
-            return;
-        }
-
-        const anyOn = lights.some(l => l.status === 'on');
-        lights.forEach(light => {
-            light.status = anyOn ? 'off' : 'on';
-        });
-
-        const action = anyOn ? 'éteintes' : 'allumées';
-        this.addNotification(`💡 Toutes les lumières ${action}`, 'info');
-        this.addActivity(`Toutes les lumières ${action}`, 'light', '💡');
-        this.showToast(`Toutes les lumières sont ${action}`, 'success');
-        
-        this.saveData();
-        this.renderAll();
+        if(!this.canControl())return;
+        const lights=this.devices.filter(d=>d.type==='light');
+        if(!lights.length){this.showToast('Aucune lumière','info');return;}
+        const anyOn=lights.some(l=>l.status==='on');
+        lights.forEach(l=>l.status=anyOn?'off':'on');
+        const a=anyOn?'éteintes':'allumées';
+        this.addNotification(`💡 Toutes les lumières ${a}`,'info');
+        this.addActivity(`Toutes les lumières ${a}`,'light','💡');
+        this.showToast(`Lumières ${a}`,'success');
+        this.saveData(); this.renderAll();
     }
 
     closeAllDoorsWindows() {
-        if (!this.canControl()) return;
-
-        const items = this.devices.filter(d => d.type === 'door' || d.type === 'window');
-        let closedCount = 0;
-
-        items.forEach(item => {
-            if (item.status === 'open') {
-                item.status = 'closed';
-                closedCount++;
-            }
-        });
-
-        if (closedCount > 0) {
-            this.addNotification(`🔒 ${closedCount} ouverture(s) fermée(s)`, 'info');
-            this.addActivity(`${closedCount} ouverture(s) fermée(s)`, 'system', '🔒');
-            this.showToast(`${closedCount} ouverture(s) fermée(s)`, 'success');
-            this.saveData();
-            this.renderAll();
-        } else {
-            this.showToast('Tout est déjà fermé', 'info');
-        }
+        if(!this.canControl())return;
+        const items=this.devices.filter(d=>(d.type==='door'||d.type==='window')&&d.status==='open');
+        if(!items.length){this.showToast('Tout est fermé','info');return;}
+        items.forEach(i=>i.status='closed');
+        this.addNotification(`🔒 ${items.length} ouverture(s) fermée(s)`,'info');
+        this.addActivity(`${items.length} fermeture(s)`,'system','🔒');
+        this.showToast(`${items.length} fermeture(s)`,'success');
+        this.saveData(); this.renderAll();
     }
 
-    getActionText(device) {
-        if (device.type === 'door' || device.type === 'window') {
-            return device.status === 'open' ? 'ouverte' : 'fermée';
-        }
-        if (device.type === 'light') {
-            return device.status === 'on' ? 'allumée' : 'éteinte';
-        }
-        return 'modifié(e)';
-    }
+    getActionText(d){return{door:d.status==='open'?'ouverte':'fermée',window:d.status==='open'?'ouverte':'fermée',light:d.status==='on'?'allumée':'éteinte'}[d.type]||'modifié(e)';}
+    getDeviceEmoji(t){return{door:'🚪',window:'🪟',light:'💡',camera:'📹'}[t]||'📦';}
 
-    getDeviceEmoji(type) {
-        return { door: '🚪', window: '🪟', light: '💡', camera: '📹' }[type] || '📦';
-    }
-
-    /* ==================== CAMÉRAS - GESTION COMPLÈTE ==================== */
-
-    /**
-     * Ouvre le modal de configuration d'une caméra
-     */
+    /* ==================== CAMÉRAS ==================== */
     openConfigCameraModal(deviceId) {
-        const device = this.devices.find(d => d.id === deviceId);
-        if (!device || device.type !== 'camera') return;
-
-        this.currentConfigCameraId = deviceId;
-        
-        const urlInput = document.getElementById('config-camera-url');
-        if (urlInput) {
-            urlInput.value = device.cameraUrl || '';
-        }
-        
+        const d=this.devices.find(x=>x.id===deviceId);
+        if(!d||d.type!=='camera')return;
+        this.currentConfigCameraId=deviceId;
+        document.getElementById('config-camera-url').value=d.cameraUrl||'';
         document.getElementById('modal-config-camera').classList.add('active');
-        
-        // Afficher l'état actuel
-        const statusText = device.localStream ? 
-            '📱 Caméra téléphone active' : 
-            (device.cameraUrl ? '🌐 Caméra IP configurée' : '❌ Aucun flux configuré');
-        console.log('Configuration caméra:', device.name, '-', statusText);
     }
-
-    /**
-     * Ferme le modal de configuration
-     */
-    closeConfigCameraModal() {
-        document.getElementById('modal-config-camera').classList.remove('active');
-        this.currentConfigCameraId = null;
-    }
-
-    /**
-     * Sauvegarde la configuration de la caméra (URL IP)
-     */
+    closeConfigCameraModal() { document.getElementById('modal-config-camera').classList.remove('active'); this.currentConfigCameraId=null; }
+    
     saveCameraConfig() {
-        if (!this.currentConfigCameraId) return;
-
-        const device = this.devices.find(d => d.id === this.currentConfigCameraId);
-        if (!device) return;
-
-        const url = document.getElementById('config-camera-url').value.trim();
-
-        // Arrêter le flux local si existant
-        if (device.localStream) {
-            this.stopDeviceStream(device);
-        }
-
-        device.cameraUrl = url || null;
-        device.streamType = url ? 'remote' : null;
-        
-        this.saveData();
-        this.renderAll();
-        this.closeConfigCameraModal();
-        
-        this.showToast('✅ Caméra configurée', 'success');
-        this.addActivity(`Caméra ${device.name} configurée`, 'camera', '📹');
+        if(!this.currentConfigCameraId)return;
+        const d=this.devices.find(x=>x.id===this.currentConfigCameraId);
+        if(!d)return;
+        if(d.localStream)this.stopDeviceStream(d);
+        d.cameraUrl=document.getElementById('config-camera-url').value.trim()||null;
+        d.streamType=d.cameraUrl?'remote':null;
+        this.saveData(); this.renderAll(); this.closeConfigCameraModal();
+        this.showToast('✅ Caméra configurée','success');
+        this.addActivity(`Caméra ${d.name} configurée`,'camera','📹');
     }
 
-    /**
-     * Active la caméra du téléphone/PC
-     */
     async usePhoneCamera() {
-        if (!this.currentConfigCameraId) {
-            console.error('❌ Aucune caméra sélectionnée');
-            return;
-        }
-
-        const device = this.devices.find(d => d.id === this.currentConfigCameraId);
-        if (!device) return;
-
-        // Fermer le modal immédiatement pour voir le résultat
+        if(!this.currentConfigCameraId)return;
+        const d=this.devices.find(x=>x.id===this.currentConfigCameraId);
+        if(!d)return;
         this.closeConfigCameraModal();
-
         try {
-            // Arrêter l'ancien flux proprement
-            this.stopDeviceStream(device);
-
-            console.log('📱 Demande d\'accès à la caméra...');
-            
-            // Demander la caméra avec des paramètres optimaux
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: 'environment', // Caméra arrière sur mobile
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                },
-                audio: false
-            });
-
-            console.log('✅ Caméra obtenue:', stream.getVideoTracks()[0].label);
-
-            // Sauvegarder le flux
-            device.localStream = stream;
-            device.cameraUrl = null;
-            device.streamType = 'local';
-            device.status = 'recording';
-
-            // Suivre l'état du flux
-            const videoTrack = stream.getVideoTracks()[0];
-            
-            videoTrack.addEventListener('ended', () => {
-                console.log('📴 Flux vidéo terminé');
-                device.localStream = null;
-                device.status = 'online';
-                device.streamType = null;
-                this.saveData();
-                this.renderAll();
-            });
-
-            this.saveData();
-            this.renderAll();
-
-            // Attacher le flux après rendu
-            setTimeout(() => {
-                this.attachStreamToVideo(device.id, stream);
-            }, 200);
-
-            this.showToast('📱 Caméra activée ! Vous voyez le direct', 'success');
-            this.addActivity(`Caméra ${device.name} : flux local activé`, 'camera', '📱');
-
-        } catch (error) {
-            console.error('❌ Erreur caméra:', error);
-            
-            let errorMsg = 'Erreur d\'accès à la caméra';
-            if (error.name === 'NotAllowedError') {
-                errorMsg = 'Accès caméra refusé. Autorisez dans les paramètres.';
-            } else if (error.name === 'NotFoundError') {
-                errorMsg = 'Aucune caméra trouvée sur cet appareil.';
-            } else if (error.name === 'NotReadableError') {
-                errorMsg = 'Caméra déjà utilisée. Fermez les autres apps.';
-            }
-            
-            this.showToast('❌ ' + errorMsg, 'error');
+            this.stopDeviceStream(d);
+            const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}},audio:false});
+            d.localStream=stream; d.cameraUrl=null; d.streamType='local'; d.status='recording';
+            stream.getVideoTracks()[0].addEventListener('ended',()=>{d.localStream=null;d.status='online';d.streamType=null;this.saveData();this.renderAll();});
+            this.saveData(); this.renderAll();
+            setTimeout(()=>this.attachStreamToVideo(d.id,stream),200);
+            this.showToast('📱 Caméra activée !','success');
+            this.addActivity(`Caméra ${d.name} activée`,'camera','📱');
+        }catch(e){
+            let m='Erreur caméra';
+            if(e.name==='NotAllowedError')m='Accès refusé';
+            else if(e.name==='NotFoundError')m='Pas de caméra';
+            this.showToast('❌ '+m,'error');
         }
     }
 
-    /**
-     * Arrête le flux d'un appareil spécifique
-     */
-    stopDeviceStream(device) {
-        if (!device || !device.localStream) return;
-
-        console.log('🛑 Arrêt du flux:', device.name);
-        
-        device.localStream.getTracks().forEach(track => {
-            track.stop();
-            console.log('  - Track arrêtée:', track.kind);
-        });
-        
-        device.localStream = null;
-        device.streamType = null;
-        
-        if (device.type === 'camera' && device.status === 'recording') {
-            device.status = 'online';
-        }
+    stopDeviceStream(d) {
+        if(!d?.localStream)return;
+        d.localStream.getTracks().forEach(t=>t.stop());
+        d.localStream=null; d.streamType=null;
+        if(d.type==='camera'&&d.status==='recording')d.status='online';
     }
 
-    /**
-     * Arrête TOUS les flux caméra
-     */
-    stopAllCameraStreams() {
-        console.log('📴 Arrêt de tous les flux...');
-        this.devices.forEach(device => {
-            if (device.localStream) {
-                this.stopDeviceStream(device);
-            }
-        });
-        this.activeStreams.clear();
+    stopAllCameraStreams() { this.devices.forEach(d=>{if(d.localStream)this.stopDeviceStream(d);}); }
+    attachStreamToVideo(deviceId,stream){const v=document.getElementById(`video-${deviceId}`);if(v&&stream?.active){v.srcObject=stream;v.muted=true;v.playsInline=true;v.play().catch(()=>{});}}
+    refreshAllVideoStreams(){this.devices.forEach(d=>{if(d.type==='camera'&&d.localStream?.active)setTimeout(()=>this.attachStreamToVideo(d.id,d.localStream),100);});}
+
+    /* ==================== CAPTURE IMAGES ==================== */
+    captureImage(deviceId) {
+        const d=this.devices.find(x=>x.id===deviceId);
+        if(!d||d.type!=='camera'){this.showToast('❌ Caméra non trouvée','error');return;}
+        if(d.localStream?.active)this.captureFromStream(d,d.localStream,true);
+        else if(d.cameraUrl)this.captureFromUrl(d);
+        else this.showToast('❌ Aucun flux disponible','error');
     }
 
-    /**
-     * Attache un flux vidéo à l'élément HTML
-     */
-    attachStreamToVideo(deviceId, stream) {
-        const videoEl = document.getElementById(`video-${deviceId}`);
-        if (videoEl && stream && stream.active) {
-            videoEl.srcObject = stream;
-            videoEl.muted = true;
-            videoEl.playsInline = true;
-            
-            videoEl.play()
-                .then(() => console.log('▶️ Lecture vidéo OK:', deviceId))
-                .catch(e => console.warn('⚠️ Erreur lecture:', e));
-        } else {
-            console.warn('⚠️ Impossible d\'attacher le flux:', deviceId);
-        }
+    captureFromStream(d,stream,isVideo) {
+        try {
+            const el=isVideo?document.getElementById(`video-${d.id}`):document.getElementById(`img-${d.id}`);
+            if(!el||(isVideo&&!el.srcObject)){this.showToast('❌ Flux non disponible','error');return;}
+            const canvas=document.createElement('canvas');
+            canvas.width=isVideo?(el.videoWidth||640):(el.naturalWidth||640);
+            canvas.height=isVideo?(el.videoHeight||480):(el.naturalHeight||480);
+            const ctx=canvas.getContext('2d'); ctx.drawImage(el,0,0,canvas.width,canvas.height);
+            ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,canvas.height-40,canvas.width,40);
+            ctx.fillStyle='#fff';ctx.font='16px monospace';ctx.fillText(new Date().toLocaleString('fr-FR'),10,canvas.height-12);
+            this.saveCapture(d,canvas.toDataURL('image/jpeg',0.85),canvas.width,canvas.height);
+            this.flashEffect(d.id);
+        }catch(e){console.error('Erreur capture:',e);this.showToast('❌ Erreur capture','error');}
     }
 
-    /**
-     * Rafraîchit tous les flux vidéo actifs
-     */
-    refreshAllVideoStreams() {
-        let refreshed = 0;
-        this.devices.forEach(device => {
-            if (device.type === 'camera' && device.localStream && device.localStream.active) {
-                setTimeout(() => {
-                    this.attachStreamToVideo(device.id, device.localStream);
-                    refreshed++;
-                }, 100);
-            }
-        });
-        if (refreshed > 0) {
-            console.log('🔄 Flux rafraîchis:', refreshed);
-        }
+    captureFromUrl(d) {
+        const img=document.getElementById(`img-${d.id}`);
+        if(!img||!img.complete||img.naturalWidth===0){this.showToast('❌ Image non chargée','error');return;}
+        this.captureFromStream(d,null,false);
     }
 
-    /* ==================== APPAREILS (AJOUTER/SUPPRIMER) ==================== */
-    openAddDeviceModal() {
-        document.getElementById('modal-add-device').classList.add('active');
-        document.getElementById('new-device-name').focus();
-        this.onDeviceTypeChange();
-    }
-
-    closeAddDeviceModal() {
-        document.getElementById('modal-add-device').classList.remove('active');
-        document.getElementById('new-device-name').value = '';
-        document.getElementById('new-device-room').value = '';
-        document.getElementById('new-camera-url').value = '';
-        document.getElementById('camera-url-group').style.display = 'none';
-    }
-
-    onDeviceTypeChange() {
-        const type = document.getElementById('new-device-type').value;
-        const urlGroup = document.getElementById('camera-url-group');
-        if (urlGroup) {
-            urlGroup.style.display = type === 'camera' ? 'block' : 'none';
-        }
-    }
-
-    addDevice() {
-        const name = document.getElementById('new-device-name').value.trim();
-        const type = document.getElementById('new-device-type').value;
-        const room = document.getElementById('new-device-room').value.trim();
-        const cameraUrl = document.getElementById('new-camera-url')?.value.trim() || null;
-
-        if (!name) {
-            this.showToast('Veuillez entrer un nom', 'error');
-            return;
-        }
-
-        const icons = {
-            door: 'fa-door-closed',
-            window: 'fa-window-maximize',
-            light: 'fa-lightbulb',
-            camera: 'fa-video'
-        };
-
-        const newDevice = {
-            id: type + '-' + Date.now(),
-            name: name,
-            type: type,
-            room: room || 'Non spécifié',
-            status: type === 'camera' ? 'online' : (type === 'light' ? 'off' : 'closed'),
-            icon: icons[type],
-            cameraUrl: type === 'camera' ? cameraUrl : null,
-            streamType: type === 'camera' && cameraUrl ? 'remote' : null,
-            localStream: null
-        };
-
-        this.devices.push(newDevice);
-        
-        this.addNotification(`✅ ${name} ajouté(e)`, 'success');
-        this.addActivity(`${name} ajouté(e)`, 'system', this.getDeviceEmoji(type));
-        
+    saveCapture(d,data,w,h) {
+        const cap={id:'cap-'+Date.now(),timestamp:new Date().toISOString(),imageData:data,width:w,height:h,size:(data.length/1024).toFixed(1)+' KB',deviceId:d.id,deviceName:d.name,type:'manual'};
+        if(!d.captures)d.captures=[];
+        d.captures.unshift(cap);
+        if(d.captures.length>50)d.captures=d.captures.slice(0,50);
         this.saveData();
-        this.renderAll();
-        this.closeAddDeviceModal();
-        this.showToast(`${name} ajouté !`, 'success');
+        this.addActivity(`📸 Capture: ${d.name}`,'camera','📸');
+        this.addNotification(`📸 Image capturée: ${d.name}`,'success');
+        this.showToast('📸 Capture enregistrée !','success');
+        if(document.getElementById(`gallery-${d.id}`)?.classList.contains('active'))this.renderCapturesGallery(d.id);
     }
 
-    deleteDevice(deviceId) {
-        if (!this.canControl()) return;
+    flashEffect(id){const c=document.querySelector(`#video-${id}`)?.parentElement||document.querySelector(`#img-${id}`)?.parentElement;if(c){c.style.filter='brightness(2)';setTimeout(()=>c.style.filter='brightness(1)',150);}}
 
-        const device = this.devices.find(d => d.id === deviceId);
-        if (!device) return;
+    toggleCapturesGallery(deviceId){const g=document.getElementById(`gallery-${deviceId}`);if(!g)return;g.classList.toggle('active');if(g.classList.contains('active'))this.renderCapturesGallery(deviceId);}
 
-        if (confirm(`Supprimer "${device.name}" ?`)) {
-            // Arrêter le flux si caméra
-            if (device.localStream) {
-                this.stopDeviceStream(device);
-            }
-
-            this.devices = this.devices.filter(d => d.id !== deviceId);
-            
-            this.addNotification(`🗑️ ${device.name} supprimé(e)`, 'info');
-            this.addActivity(`${device.name} supprimé(e)`, 'system', '🗑️');
-            
-            this.saveData();
-            this.renderAll();
-            this.showToast(`${device.name} supprimé(e)`, 'info');
-        }
-    }
-
-    /* ==================== RENDU DE L'INTERFACE ==================== */
-    renderAll() {
-        this.renderDashboard();
-        this.renderDoorsWindows();
-        this.renderLights();
-        this.renderCameras();
-        this.renderActivity();
-        this.renderNotifications();
-        this.updateNotificationBadge();
-        
-        // Rafraîchir les flux vidéo
-        setTimeout(() => this.refreshAllVideoStreams(), 300);
-    }
-
-    renderDashboard() {
-        const doors = this.devices.filter(d => d.type === 'door');
-        const windows = this.devices.filter(d => d.type === 'window');
-        const lights = this.devices.filter(d => d.type === 'light');
-        const cameras = this.devices.filter(d => d.type === 'camera');
-
-        this.setElementText('summary-doors', `${doors.filter(d => d.status === 'open').length}/${doors.length}`);
-        this.setElementText('summary-windows', `${windows.filter(d => d.status === 'open').length}/${windows.length}`);
-        this.setElementText('summary-lights', `${lights.filter(l => l.status === 'on').length}/${lights.length}`);
-        this.setElementText('summary-cameras', cameras.filter(c => c.status === 'online' || c.status === 'recording').length);
-
-        const quickGrid = document.getElementById('quick-access-grid');
-        if (quickGrid) {
-            const allDevices = [...doors, ...windows, ...lights, ...cameras].slice(0, 6);
-            quickGrid.innerHTML = allDevices.length > 0 ?
-                allDevices.map(d => this.createDeviceCard(d)).join('') :
-                '<div class="empty-state"><i class="fas fa-plug"></i><p>Aucun appareil</p></div>';
-        }
-
-        const recentActivity = document.getElementById('recent-activity');
-        if (recentActivity) {
-            recentActivity.innerHTML = this.activityLog.length > 0 ?
-                this.activityLog.slice(0, 5).map(a => this.createActivityItem(a)).join('') :
-                '<div class="empty-state"><i class="fas fa-history"></i><p>Aucune activité</p></div>';
-        }
-    }
-
-    renderDoorsWindows() {
-        const grid = document.getElementById('doors-windows-grid');
-        if (!grid) return;
-
-        const items = this.devices.filter(d => d.type === 'door' || d.type === 'window');
-        grid.innerHTML = items.length > 0 ?
-            items.map(d => this.createDeviceCard(d)).join('') :
-            '<div class="empty-state"><i class="fas fa-door-closed"></i><p>Aucune porte ou fenêtre</p></div>';
-    }
-
-    renderLights() {
-        const grid = document.getElementById('lights-grid');
-        if (!grid) return;
-
-        const lights = this.devices.filter(d => d.type === 'light');
-        grid.innerHTML = lights.length > 0 ?
-            lights.map(d => this.createDeviceCard(d)).join('') :
-            '<div class="empty-state"><i class="fas fa-lightbulb"></i><p>Aucune lumière</p></div>';
-
-        const btnAllLights = document.getElementById('btn-all-lights');
-        if (btnAllLights && lights.length > 0) {
-            const anyOn = lights.some(l => l.status === 'on');
-            btnAllLights.innerHTML = anyOn ?
-                '<i class="fas fa-power-off"></i> Tout éteindre' :
-                '<i class="fas fa-power-off"></i> Tout allumer';
-        }
-    }
-
-    renderCameras() {
-        const grid = document.getElementById('cameras-grid');
-        if (!grid) return;
-
-        const cameras = this.devices.filter(d => d.type === 'camera');
-        grid.innerHTML = cameras.length > 0 ?
-            cameras.map(d => this.createDeviceCard(d)).join('') :
-            '<div class="empty-state"><i class="fas fa-video-slash"></i><p>Aucune caméra</p></div>';
-    }
-
-    createDeviceCard(device) {
-        const statusClass = this.getStatusClass(device);
-        const statusText = this.getStatusText(device);
-        const isControllable = device.type !== 'camera';
-        const disabled = !this.isInProximity && isControllable ? 'disabled' : '';
-
-        // Contrôles selon le type
-        let controlsHtml = '';
-        
-        if (device.type === 'light') {
-            controlsHtml = `
-                <label class="toggle-switch">
-                    <input type="checkbox" ${device.status === 'on' ? 'checked' : ''} 
-                           onchange="app.toggleDevice('${device.id}')" ${disabled}>
-                    <span class="toggle-slider"></span>
-                </label>
-            `;
-        } else if (device.type === 'door' || device.type === 'window') {
-            controlsHtml = `
-                <button class="btn ${device.status === 'open' ? 'btn-danger' : 'btn-primary'} btn-sm" 
-                        onclick="app.toggleDevice('${device.id}')" ${disabled}>
-                    <i class="fas fa-${device.status === 'open' ? 'lock' : 'lock-open'}"></i>
-                    ${device.status === 'open' ? 'Fermer' : 'Ouvrir'}
-                </button>
-            `;
-        } else if (device.type === 'camera') {
-            controlsHtml = `
-                <button class="btn btn-outline btn-sm" 
-                        onclick="app.openConfigCameraModal('${device.id}')" 
-                        data-always-enabled="true">
-                    <i class="fas fa-cog"></i> Configurer
-                </button>
-                ${device.localStream ? `
-                    <button class="btn btn-danger btn-sm" 
-                            onclick="app.stopDeviceStream(app.devices.find(d=>d.id==='${device.id}')); app.saveData(); app.renderAll();" 
-                            data-always-enabled="true">
-                        <i class="fas fa-stop"></i> Arrêter
-                    </button>
-                ` : ''}
-            `;
-        }
-
-        // Affichage caméra
-        let cameraHtml = '';
-        if (device.type === 'camera') {
-            if (device.localStream) {
-                // Flux local (caméra du téléphone)
-                cameraHtml = `
-                    <div class="camera-container" style="background:#000;">
-                        <video class="camera-feed-video" 
-                               id="video-${device.id}" 
-                               autoplay playsinline muted
-                               style="width:100%;height:100%;object-fit:cover;">
-                        </video>
-                        <div class="camera-recording-badge">● DIRECT</div>
-                    </div>
-                `;
-            } else if (device.cameraUrl) {
-                // Flux distant (caméra IP)
-                cameraHtml = `
-                    <div class="camera-container">
-                        <img class="camera-feed-img" 
-                             id="img-${device.id}" 
-                             src="${device.cameraUrl}" 
-                             alt="Flux ${device.name}"
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                             onload="this.style.display='block';"
-                             style="width:100%;height:100%;object-fit:cover;">
-                        <div class="camera-error" style="display:none;">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <p>Flux inaccessible</p>
-                            <small>Vérifiez l'URL ou le réseau</small>
-                        </div>
-                    </div>
-                `;
-            } else {
-                // Aucun flux configuré
-                cameraHtml = `
-                    <div class="camera-container">
-                        <div class="camera-placeholder">
-                            <i class="fas fa-video-slash"></i>
-                            <p>Aucun flux</p>
-                            <small>Cliquez sur Configurer</small>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        return `
-            <div class="device-card type-${device.type}">
-                <div class="device-card-header">
-                    <div class="device-card-icon">
-                        <i class="fas ${device.icon}"></i>
-                    </div>
-                    <span class="device-status-badge ${statusClass}">${statusText}</span>
-                </div>
-                <div class="device-card-name">${device.name}</div>
-                <div class="device-card-room">
-                    <i class="fas fa-map-marker-alt"></i> ${device.room}
-                </div>
-                ${cameraHtml}
-                <div class="device-card-actions">
-                    ${controlsHtml}
-                    <button class="btn btn-outline btn-sm" 
-                            onclick="app.deleteDevice('${device.id}')"
-                            ${!this.isInProximity ? 'disabled' : ''} 
-                            title="Supprimer">
-                        <i class="fas fa-trash"></i>
-                    </button>
+    renderCapturesGallery(deviceId) {
+        const d=this.devices.find(x=>x.id===deviceId);
+        if(!d)return;
+        const c=document.getElementById(`gallery-content-${deviceId}`);
+        if(!c)return;
+        if(!d.captures?.length){c.innerHTML='<div class="empty-state"><i class="fas fa-camera-retro"></i><p>Aucune capture</p></div>';return;}
+        c.innerHTML=d.captures.map(cap=>`
+            <div class="capture-thumbnail" onclick="app.viewCaptureFullscreen('${deviceId}','${cap.id}')">
+                <img src="${cap.imageData}" alt="Capture" loading="lazy">
+                <div class="capture-info"><span>${new Date(cap.timestamp).toLocaleString('fr-FR')}</span><span>${cap.size}</span></div>
+                <div class="capture-actions">
+                    <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();app.downloadCapture('${deviceId}','${cap.id}')"><i class="fas fa-download"></i></button>
+                    <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();app.deleteCapture('${deviceId}','${cap.id}')"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
-        `;
+        `).join('');
     }
 
-    getStatusClass(device) {
-        const openStatuses = ['open', 'on', 'online', 'recording'];
-        return openStatuses.includes(device.status) ? 'open' : 'closed';
+    viewCaptureFullscreen(deviceId,captureId){
+        const d=this.devices.find(x=>x.id===deviceId);if(!d)return;
+        const cap=d.captures?.find(x=>x.id===captureId);if(!cap)return;
+        const m=document.createElement('div');m.className='fullscreen-modal';
+        m.innerHTML=`<div class="fullscreen-overlay" onclick="this.parentElement.remove()"></div><div class="fullscreen-content"><button class="fullscreen-close" onclick="this.parentElement.parentElement.remove()"><i class="fas fa-times"></i></button><img src="${cap.imageData}" alt="Capture"><div class="fullscreen-info"><span>${d.name} - ${new Date(cap.timestamp).toLocaleString('fr-FR')}</span><span>${cap.size}</span><div style="margin-top:10px"><button class="btn btn-primary btn-sm" onclick="app.downloadCapture('${deviceId}','${captureId}')"><i class="fas fa-download"></i> Télécharger</button><button class="btn btn-outline btn-sm" onclick="app.deleteCapture('${deviceId}','${captureId}');this.closest('.fullscreen-modal').remove()"><i class="fas fa-trash"></i> Supprimer</button></div></div></div>`;
+        document.body.appendChild(m);
     }
 
-    getStatusText(device) {
-        const texts = {
-            door: { open: 'Ouverte', closed: 'Fermée' },
-            window: { open: 'Ouverte', closed: 'Fermée' },
-            light: { on: 'Allumée', off: 'Éteinte' },
-            camera: { online: 'En ligne', offline: 'Hors ligne', recording: 'En direct' }
-        };
-        return texts[device.type]?.[device.status] || device.status;
+    downloadCapture(deviceId,captureId){
+        const d=this.devices.find(x=>x.id===deviceId);if(!d)return;
+        const cap=d.captures?.find(x=>x.id===captureId);if(!cap)return;
+        const a=document.createElement('a');a.href=cap.imageData;a.download=`capture-${d.name}-${cap.id}.jpg`;document.body.appendChild(a);a.click();document.body.removeChild(a);
+        this.showToast('💾 Image téléchargée','success');
     }
+
+    deleteCapture(deviceId,captureId){
+        const d=this.devices.find(x=>x.id===deviceId);if(!d)return;
+        if(confirm('Supprimer cette capture ?')){d.captures=d.captures.filter(c=>c.id!==captureId);this.saveData();this.renderCapturesGallery(deviceId);this.showToast('🗑️ Supprimée','info');}
+    }
+
+    clearAllCaptures(deviceId){
+        const d=this.devices.find(x=>x.id===deviceId);if(!d?.captures?.length){this.showToast('Aucune capture','info');return;}
+        if(confirm(`Supprimer ${d.captures.length} captures ?`)){d.captures=[];this.saveData();this.renderCapturesGallery(deviceId);this.renderAll();this.showToast('Captures supprimées','info');}
+    }
+
+    /* ==================== ENREGISTREMENT VIDÉO ==================== */
+    async toggleRecording(deviceId) {
+        const d=this.devices.find(x=>x.id===deviceId);
+        if(!d||d.type!=='camera')return;
+        if(videoRecorder.isRecording(deviceId)){
+            videoRecorder.stopRecording(deviceId);
+            this.showToast('⏹️ Enregistrement arrêté','info');
+            if(this.recordingTimers[deviceId]){clearInterval(this.recordingTimers[deviceId]);delete this.recordingTimers[deviceId];}
+        }else{
+            if(!d.localStream?.active){this.showToast('❌ Activez d\'abord la caméra','error');return;}
+            const started=await videoRecorder.startRecording(deviceId,d.localStream,{maxDuration:60,type:'manual'});
+            if(started){
+                this.showToast('🔴 Enregistrement (60s max)','success');
+                this.addActivity(`Enregistrement: ${d.name}`,'camera','🔴');
+                this.startRecordingTimer(deviceId);
+            }
+        }
+        this.renderAll();
+    }
+
+    startRecordingTimer(deviceId) {
+        if(this.recordingTimers[deviceId])clearInterval(this.recordingTimers[deviceId]);
+        this.recordingTimers[deviceId]=setInterval(()=>{
+            if(!videoRecorder.isRecording(deviceId)){clearInterval(this.recordingTimers[deviceId]);delete this.recordingTimers[deviceId];this.renderAll();return;}
+            const timer=document.getElementById(`recording-timer-${deviceId}`);
+            if(timer){const d=videoRecorder.getRecordingDuration(deviceId);const m=Math.floor(d/60),s=Math.floor(d%60);timer.textContent=`🔴 ENREGISTREMENT ${m}:${s.toString().padStart(2,'0')}`;}
+        },1000);
+    }
+
+    toggleMotionDetection(deviceId) {
+        const d=this.devices.find(x=>x.id===deviceId);
+        if(!d||d.type!=='camera')return;
+        if(d.motionInterval){clearInterval(d.motionInterval);d.motionInterval=null;d.motionDetection=false;this.showToast('🔍 Détection désactivée','info');}
+        else{
+            if(!d.localStream?.active){this.showToast('❌ Activez la caméra','error');return;}
+            d.motionDetection=true;
+            d.motionInterval=setInterval(async()=>{
+                if(Math.random()<0.3&&!videoRecorder.isRecording(deviceId)){
+                    this.addNotification(`🏃 Mouvement: ${d.name}`,'warning');
+                    const started=await videoRecorder.startRecording(deviceId,d.localStream,{maxDuration:30,type:'motion'});
+                    if(started){this.addActivity(`Enregistrement auto: ${d.name}`,'camera','🏃');this.renderAll();this.startRecordingTimer(deviceId);}
+                }
+            },10000);
+            this.showToast('🔍 Détection activée','success');
+        }
+        this.saveData();this.renderAll();
+    }
+
+    async showVideoGallery(deviceId) {
+        const d=this.devices.find(x=>x.id===deviceId);if(!d)return;
+        const recordings=await videoRecorder.getRecordings(deviceId);
+        const modal=document.createElement('div');modal.className='modal-overlay active';
+        modal.innerHTML=`<div class="modal" style="max-width:600px"><div class="modal-header"><h2>📹 ${d.name}</h2><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button></div><div class="modal-body">${recordings.length===0?'<div class="empty-state"><i class="fas fa-video-slash"></i><p>Aucun enregistrement</p></div>':`<div class="recordings-list">${recordings.map(r=>`<div class="recording-item"><div class="recording-item-info"><i class="fas fa-video"></i><div><strong>${new Date(r.startTime).toLocaleString('fr-FR')}</strong><small>${r.duration.toFixed(1)}s • ${(r.blobSize/1024/1024).toFixed(2)} MB • ${r.type==='motion'?'🏃 Mouvement':'👤 Manuel'}</small></div></div><div class="recording-item-actions"><button class="btn btn-primary btn-sm" onclick="videoRecorder.playRecording('${r.id}')"><i class="fas fa-play"></i> Lire</button><button class="btn btn-outline btn-sm" onclick="videoRecorder.downloadRecording('${r.id}')"><i class="fas fa-download"></i></button><button class="btn btn-outline btn-sm" onclick="videoRecorder.deleteRecording('${r.id}');this.closest('.modal-overlay').remove();app.showVideoGallery('${deviceId}')"><i class="fas fa-trash"></i></button></div></div>`).join('')}</div>`}</div></div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click',(e)=>{if(e.target===modal)modal.remove();});
+    }
+
+    async renderAllRecordings() {
+        const container=document.getElementById('all-recordings-container');
+        if(!container)return;
+        try {
+            const recordings=await videoRecorder.getRecordings();
+            const usage=await videoRecorder.getStorageUsage();
+            if(recordings.length===0){container.innerHTML='<div class="empty-state"><i class="fas fa-film"></i><p>Aucun enregistrement</p><small>Enregistrez des vidéos depuis l\'onglet Caméras</small></div>';return;}
+            container.innerHTML=`<p style="margin-bottom:15px;color:var(--text-secondary);">${usage.count} vidéos • ${usage.totalSizeMB} MB utilisés</p><div class="recordings-list">${recordings.map(r=>{const d=this.devices.find(x=>x.id===r.deviceId);return`<div class="recording-item"><div class="recording-item-info"><i class="fas fa-video"></i><div><strong>${d?.name||r.deviceId}</strong><small>${new Date(r.startTime).toLocaleString('fr-FR')} • ${r.duration.toFixed(1)}s • ${(r.blobSize/1024/1024).toFixed(2)} MB</small></div></div><div class="recording-item-actions"><button class="btn btn-primary btn-sm" onclick="videoRecorder.playRecording('${r.id}')"><i class="fas fa-play"></i></button><button class="btn btn-outline btn-sm" onclick="videoRecorder.downloadRecording('${r.id}')"><i class="fas fa-download"></i></button><button class="btn btn-outline btn-sm" onclick="videoRecorder.deleteRecording('${r.id}');app.renderAllRecordings()"><i class="fas fa-trash"></i></button></div></div>`}).join('')}</div>`;
+        }catch(e){container.innerHTML='<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Erreur chargement</p></div>';}
+    }
+
+    /* ==================== APPAREILS CRUD ==================== */
+    openAddDeviceModal(){document.getElementById('modal-add-device').classList.add('active');document.getElementById('new-device-name').focus();this.onDeviceTypeChange();}
+    closeAddDeviceModal(){document.getElementById('modal-add-device').classList.remove('active');['new-device-name','new-device-room','new-camera-url'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('camera-url-group').style.display='none';}
+    onDeviceTypeChange(){document.getElementById('camera-url-group').style.display=document.getElementById('new-device-type').value==='camera'?'block':'none';}
+
+    addDevice(){
+        const name=document.getElementById('new-device-name').value.trim();
+        const type=document.getElementById('new-device-type').value;
+        const room=document.getElementById('new-device-room').value.trim();
+        const cameraUrl=document.getElementById('new-camera-url')?.value.trim()||null;
+        if(!name){this.showToast('Nom requis','error');return;}
+        const icons={door:'fa-door-closed',window:'fa-window-maximize',light:'fa-lightbulb',camera:'fa-video'};
+        const nd={id:type+'-'+Date.now(),name,type,room:room||'Non spécifié',status:type==='camera'?'online':(type==='light'?'off':'closed'),icon:icons[type],cameraUrl:type==='camera'?cameraUrl:null,streamType:type==='camera'&&cameraUrl?'remote':null,localStream:null,captures:[],motionDetection:false,motionInterval:null};
+        this.devices.push(nd);
+        this.addNotification(`✅ ${name} ajouté(e)`,'success');
+        this.addActivity(`${name} ajouté(e)`,'system',this.getDeviceEmoji(type));
+        this.saveData();this.renderAll();this.closeAddDeviceModal();
+        this.showToast(`${name} ajouté !`,'success');
+    }
+
+    deleteDevice(deviceId){
+        if(!this.canControl())return;
+        const d=this.devices.find(x=>x.id===deviceId);if(!d)return;
+        if(confirm(`Supprimer "${d.name}" ?`)){
+            if(d.localStream)this.stopDeviceStream(d);
+            if(d.motionInterval)clearInterval(d.motionInterval);
+            this.devices=this.devices.filter(x=>x.id!==deviceId);
+            this.addNotification(`🗑️ ${d.name} supprimé(e)`,'info');
+            this.addActivity(`${d.name} supprimé(e)`,'system','🗑️');
+            this.saveData();this.renderAll();
+            this.showToast(`${d.name} supprimé(e)`,'info');
+        }
+    }
+
+    /* ==================== RENDU ==================== */
+    renderAll(){this.renderDashboard();this.renderDoorsWindows();this.renderLights();this.renderCameras();this.renderActivity();this.renderNotifications();this.updateNotificationBadge();setTimeout(()=>this.refreshAllVideoStreams(),300);}
+
+    renderDashboard(){
+        const doors=this.devices.filter(d=>d.type==='door'),windows=this.devices.filter(d=>d.type==='window'),lights=this.devices.filter(d=>d.type==='light'),cameras=this.devices.filter(d=>d.type==='camera');
+        this.setText('summary-doors',`${doors.filter(d=>d.status==='open').length}/${doors.length}`);
+        this.setText('summary-windows',`${windows.filter(d=>d.status==='open').length}/${windows.length}`);
+        this.setText('summary-lights',`${lights.filter(l=>l.status==='on').length}/${lights.length}`);
+        this.setText('summary-cameras',cameras.filter(c=>c.status==='online'||c.status==='recording').length);
+        const qg=document.getElementById('quick-access-grid');if(qg)qg.innerHTML=[...doors,...windows,...lights,...cameras].slice(0,6).map(d=>this.createDeviceCard(d)).join('')||'<div class="empty-state"><i class="fas fa-plug"></i><p>Aucun appareil</p></div>';
+        const ra=document.getElementById('recent-activity');if(ra)ra.innerHTML=this.activityLog.slice(0,5).map(a=>this.createActivityItem(a)).join('')||'<div class="empty-state"><i class="fas fa-history"></i><p>Aucune activité</p></div>';
+    }
+
+    renderDoorsWindows(){const g=document.getElementById('doors-windows-grid');if(!g)return;const items=this.devices.filter(d=>d.type==='door'||d.type==='window');g.innerHTML=items.length?items.map(d=>this.createDeviceCard(d)).join(''):'<div class="empty-state"><i class="fas fa-door-closed"></i><p>Aucune porte/fenêtre</p></div>';}
+    renderLights(){const g=document.getElementById('lights-grid');if(!g)return;const lights=this.devices.filter(d=>d.type==='light');g.innerHTML=lights.length?lights.map(d=>this.createDeviceCard(d)).join(''):'<div class="empty-state"><i class="fas fa-lightbulb"></i><p>Aucune lumière</p></div>';const btn=document.getElementById('btn-all-lights');if(btn&&lights.length){const anyOn=lights.some(l=>l.status==='on');btn.innerHTML=anyOn?'<i class="fas fa-power-off"></i> Tout éteindre':'<i class="fas fa-power-off"></i> Tout allumer';}}
+    renderCameras(){const g=document.getElementById('cameras-grid');if(!g)return;const cameras=this.devices.filter(d=>d.type==='camera');g.innerHTML=cameras.length?cameras.map(d=>this.createDeviceCard(d)).join(''):'<div class="empty-state"><i class="fas fa-video-slash"></i><p>Aucune caméra</p></div>';}
+
+    createDeviceCard(d){
+        const sc=this.getStatusClass(d),st=this.getStatusText(d),ic=d.type!=='camera',dis=!this.isInProximity&&ic?'disabled':'';
+        let ch='';
+        if(d.type==='light')ch=`<label class="toggle-switch"><input type="checkbox" ${d.status==='on'?'checked':''} onchange="app.toggleDevice('${d.id}')" ${dis}><span class="toggle-slider"></span></label>`;
+        else if(d.type==='door'||d.type==='window')ch=`<button class="btn ${d.status==='open'?'btn-danger':'btn-primary'} btn-sm" onclick="app.toggleDevice('${d.id}')" ${dis}><i class="fas fa-${d.status==='open'?'lock':'lock-open'}"></i> ${d.status==='open'?'Fermer':'Ouvrir'}</button>`;
+        else if(d.type==='camera'){
+            const isRec=videoRecorder.isRecording(d.id),hasStream=d.localStream||d.cameraUrl;
+            ch=`<button class="btn btn-outline btn-sm" onclick="app.openConfigCameraModal('${d.id}')" data-always-enabled="true"><i class="fas fa-cog"></i></button>`;
+            if(d.localStream)ch+=`<button class="btn ${isRec?'btn-danger':'btn-outline'} btn-sm" onclick="app.toggleRecording('${d.id}')" data-always-enabled="true"><i class="fas fa-${isRec?'stop':'record-vinyl'}"></i></button><button class="btn btn-outline btn-sm" onclick="app.toggleMotionDetection('${d.id}')" data-always-enabled="true"><i class="fas fa-${d.motionDetection?'running':'walking'}"></i></button>`;
+            ch+=`<button class="btn btn-outline btn-sm" onclick="app.showVideoGallery('${d.id}')" data-always-enabled="true"><i class="fas fa-folder-open"></i></button>`;
+        }
+
+        let camHtml='';
+        if(d.type==='camera'){
+            if(d.localStream)camHtml+=`<div class="camera-container"><video class="camera-feed-video" id="video-${d.id}" autoplay playsinline muted></video><div class="camera-recording-badge">● DIRECT</div></div>`;
+            else if(d.cameraUrl)camHtml+=`<div class="camera-container"><img class="camera-feed-img" id="img-${d.id}" src="${d.cameraUrl}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="camera-error" style="display:none"><i class="fas fa-exclamation-triangle"></i><p>Flux inaccessible</p></div></div>`;
+            else camHtml+=`<div class="camera-container"><div class="camera-placeholder"><i class="fas fa-video-slash"></i><p>Aucun flux</p></div></div>`;
+            if(videoRecorder.isRecording(d.id)){const dur=videoRecorder.getRecordingDuration(d.id);camHtml+=`<div class="recording-timer" id="recording-timer-${d.id}">🔴 ENREGISTREMENT ${Math.floor(dur/60)}:${Math.floor(dur%60).toString().padStart(2,'0')}</div>`;}
+            camHtml+=`<div class="camera-actions-bar"><button class="btn btn-primary btn-sm" onclick="app.captureImage('${d.id}')" ${!d.localStream&&!d.cameraUrl?'disabled':''}><i class="fas fa-camera"></i> Capturer</button><button class="btn btn-outline btn-sm" onclick="app.toggleCapturesGallery('${d.id}')"><i class="fas fa-images"></i> ${d.captures?.length||0}</button></div><div class="captures-gallery" id="gallery-${d.id}"><div class="gallery-header"><h4>📸 Captures (${d.captures?.length||0})</h4>${d.captures?.length?`<button class="btn btn-outline btn-sm" onclick="app.clearAllCaptures('${d.id}')"><i class="fas fa-trash"></i></button>`:''}</div><div class="gallery-grid" id="gallery-content-${d.id}"></div></div>`;
+        }
+
+        return `<div class="device-card type-${d.type}"><div class="device-card-header"><div class="device-card-icon"><i class="fas ${d.icon}"></i></div><span class="device-status-badge ${sc}">${st}</span></div><div class="device-card-name">${d.name}</div><div class="device-card-room"><i class="fas fa-map-marker-alt"></i> ${d.room}</div>${camHtml}<div class="device-card-actions">${ch}<button class="btn btn-outline btn-sm" onclick="app.deleteDevice('${d.id}')" ${!this.isInProximity?'disabled':''}><i class="fas fa-trash"></i></button></div></div>`;
+    }
+
+    getStatusClass(d){return['open','on','online','recording'].includes(d.status)?'open':'closed';}
+    getStatusText(d){return{door:{open:'Ouverte',closed:'Fermée'},window:{open:'Ouverte',closed:'Fermée'},light:{on:'Allumée',off:'Éteinte'},camera:{online:'En ligne',offline:'Hors ligne',recording:'En direct'}}[d.type]?.[d.status]||d.status;}
 
     /* ==================== ACTIVITÉ ==================== */
-    renderActivity() {
-        const fullActivity = document.getElementById('full-activity');
-        if (!fullActivity) return;
-
-        fullActivity.innerHTML = this.activityLog.length > 0 ?
-            this.activityLog.map(a => this.createActivityItem(a)).join('') :
-            '<div class="empty-state"><i class="fas fa-history"></i><p>Aucune activité</p></div>';
-    }
-
-    createActivityItem(activity) {
-        return `
-            <div class="activity-item">
-                <span class="activity-icon">${activity.emoji || '📝'}</span>
-                <span class="activity-message">${activity.message}</span>
-                <span class="activity-time">${this.formatTime(activity.timestamp)}</span>
-            </div>
-        `;
-    }
-
-    addActivity(message, type, emoji = '📝') {
-        this.activityLog.unshift({
-            message, type, emoji,
-            timestamp: new Date().toISOString()
-        });
-
-        if (this.activityLog.length > 200) {
-            this.activityLog = this.activityLog.slice(0, 200);
-        }
-
-        this.renderActivity();
-        this.saveData();
-    }
-
-    clearActivity() {
-        if (confirm('Effacer tout l\'historique ?')) {
-            this.activityLog = [];
-            this.saveData();
-            this.renderAll();
-            this.showToast('Historique effacé', 'info');
-        }
-    }
+    renderActivity(){const fa=document.getElementById('full-activity');if(fa)fa.innerHTML=this.activityLog.length?this.activityLog.map(a=>this.createActivityItem(a)).join(''):'<div class="empty-state"><i class="fas fa-history"></i><p>Aucune activité</p></div>';}
+    createActivityItem(a){return`<div class="activity-item"><span class="activity-icon">${a.emoji||'📝'}</span><span class="activity-message">${a.message}</span><span class="activity-time">${this.formatTime(a.timestamp)}</span></div>`;}
+    addActivity(m,t,e='📝'){this.activityLog.unshift({message:m,type:t,emoji:e,timestamp:new Date().toISOString()});if(this.activityLog.length>200)this.activityLog=this.activityLog.slice(0,200);this.renderActivity();this.saveData();}
+    clearActivity(){if(confirm('Effacer l\'historique ?')){this.activityLog=[];this.saveData();this.renderAll();this.showToast('Historique effacé','info');}}
 
     /* ==================== NOTIFICATIONS ==================== */
-    addNotification(message, type = 'info') {
-        this.notifications.unshift({
-            message, type,
-            timestamp: new Date().toISOString(),
-            read: false
-        });
-
-        if (this.notifications.length > 100) {
-            this.notifications = this.notifications.slice(0, 100);
-        }
-
-        this.updateNotificationBadge();
-        this.renderNotifications();
-        this.saveData();
-    }
-
-    renderNotifications() {
-        const list = document.getElementById('notification-list');
-        if (!list) return;
-
-        list.innerHTML = this.notifications.length > 0 ?
-            this.notifications.map((n, i) => `
-                <div class="notification-item ${n.read ? '' : 'unread'}" 
-                     onclick="app.markNotificationRead(${i})">
-                    <span class="notif-icon">${this.getNotifIcon(n.type)}</span>
-                    <div class="notif-content">
-                        <div>${n.message}</div>
-                        <div class="notif-time">${this.formatTime(n.timestamp)}</div>
-                    </div>
-                </div>
-            `).join('') :
-            '<div class="empty-state"><i class="fas fa-bell-slash"></i><p>Aucune notification</p></div>';
-    }
-
-    getNotifIcon(type) {
-        return { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' }[type] || '📢';
-    }
-
-    markNotificationRead(index) {
-        if (this.notifications[index]) {
-            this.notifications[index].read = true;
-            this.updateNotificationBadge();
-            this.renderNotifications();
-            this.saveData();
-        }
-    }
-
-    clearNotifications() {
-        this.notifications = [];
-        this.updateNotificationBadge();
-        this.renderNotifications();
-        this.saveData();
-        this.showToast('Notifications effacées', 'info');
-    }
-
-    updateNotificationBadge() {
-        const badge = document.getElementById('notification-badge');
-        if (!badge) return;
-
-        const unread = this.notifications.filter(n => !n.read).length;
-        badge.textContent = unread > 99 ? '99+' : unread;
-        
-        if (unread > 0) {
-            badge.classList.add('show');
-        } else {
-            badge.classList.remove('show');
-        }
-    }
-
-    toggleNotificationPanel() {
-        const panel = document.getElementById('notification-panel');
-        const overlay = document.getElementById('panel-overlay');
-        
-        if (!panel) return;
-        
-        const isActive = panel.classList.contains('active');
-        
-        if (isActive) {
-            panel.classList.remove('active');
-            if (overlay) overlay.classList.remove('active');
-        } else {
-            panel.classList.add('active');
-            if (overlay) overlay.classList.add('active');
-            this.renderNotifications();
-        }
-    }
+    addNotification(m,t='info'){this.notifications.unshift({message:m,type:t,timestamp:new Date().toISOString(),read:false});if(this.notifications.length>100)this.notifications=this.notifications.slice(0,100);this.updateNotificationBadge();this.renderNotifications();this.saveData();}
+    renderNotifications(){const l=document.getElementById('notification-list');if(l)l.innerHTML=this.notifications.length?this.notifications.map((n,i)=>`<div class="notification-item ${n.read?'':'unread'}" onclick="app.markNotificationRead(${i})"><span class="notif-icon">${{success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'}[n.type]||'📢'}</span><div class="notif-content"><div>${n.message}</div><div class="notif-time">${this.formatTime(n.timestamp)}</div></div></div>`).join(''):'<div class="empty-state"><i class="fas fa-bell-slash"></i><p>Aucune notification</p></div>';}
+    markNotificationRead(i){if(this.notifications[i]){this.notifications[i].read=true;this.updateNotificationBadge();this.renderNotifications();this.saveData();}}
+    clearNotifications(){this.notifications=[];this.updateNotificationBadge();this.renderNotifications();this.saveData();this.showToast('Notifications effacées','info');}
+    updateNotificationBadge(){const b=document.getElementById('notification-badge');if(!b)return;const u=this.notifications.filter(n=>!n.read).length;b.textContent=u>99?'99+':u;u>0?b.classList.add('show'):b.classList.remove('show');}
+    toggleNotificationPanel(){const p=document.getElementById('notification-panel'),o=document.getElementById('panel-overlay');if(!p)return;const a=p.classList.contains('active');if(a){p.classList.remove('active');if(o)o.classList.remove('active');}else{p.classList.add('active');if(o)o.classList.add('active');this.renderNotifications();}}
 
     /* ==================== NAVIGATION ==================== */
-    switchTab(tabName) {
-        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
-
-        const tabBtn = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
-        const tabPanel = document.getElementById(`panel-${tabName}`);
-
-        if (tabBtn) tabBtn.classList.add('active');
-        if (tabPanel) tabPanel.classList.add('active');
-
-        switch(tabName) {
-            case 'dashboard': this.renderDashboard(); break;
-            case 'devices': this.renderDoorsWindows(); break;
-            case 'lights': this.renderLights(); break;
-            case 'cameras': this.renderCameras(); break;
-            case 'activity': this.renderActivity(); break;
-        }
-
-        // Rafraîchir les flux vidéo après changement d'onglet
-        setTimeout(() => this.refreshAllVideoStreams(), 200);
+    switchTab(tabName){
+        document.querySelectorAll('.tab-button').forEach(b=>b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+        const btn=document.querySelector(`.tab-button[data-tab="${tabName}"]`),panel=document.getElementById(`panel-${tabName}`);
+        if(btn)btn.classList.add('active');if(panel)panel.classList.add('active');
+        switch(tabName){case'dashboard':this.renderDashboard();break;case'devices':this.renderDoorsWindows();break;case'lights':this.renderLights();break;case'cameras':this.renderCameras();break;case'recordings':this.renderAllRecordings();break;case'activity':this.renderActivity();break;}
+        setTimeout(()=>this.refreshAllVideoStreams(),200);
     }
 
-    /* ==================== INTERFACE UTILISATEUR ==================== */
-    updateConnectionUI() {
-        const badge = document.getElementById('connection-badge');
-        const text = document.getElementById('connection-text');
-        const alert = document.getElementById('proximity-alert');
+    /* ==================== UI ==================== */
+    updateConnectionUI(){
+        const badge=document.getElementById('connection-badge'),text=document.getElementById('connection-text'),alert=document.getElementById('proximity-alert');
+        if(!badge||!text)return;
+        badge.className='connection-badge';
+        if(this.isInProximity){badge.classList.add('local');text.textContent='Connecté (Local)';}
+        else if(this.isLoggedIn){badge.classList.add('remote');text.textContent='Distant (Lecture seule)';}
+        else{badge.classList.add('disconnected');text.textContent='Déconnecté';}
+        if(alert)alert.classList.toggle('show',!this.isInProximity&&this.isLoggedIn);
+    }
+    setText(id,text){const el=document.getElementById(id);if(el)el.textContent=text;}
 
-        if (!badge || !text) return;
-
-        badge.className = 'connection-badge';
-        
-        if (this.isInProximity) {
-            badge.classList.add('local');
-            text.textContent = 'Connecté (Local)';
-        } else if (this.isLoggedIn) {
-            badge.classList.add('remote');
-            text.textContent = 'Distant (Lecture seule)';
-        } else {
-            badge.classList.add('disconnected');
-            text.textContent = 'Déconnecté';
-        }
-
-        if (alert) {
-            alert.classList.toggle('show', !this.isInProximity && this.isLoggedIn);
-        }
+    showToast(m,t='info'){
+        const c=document.getElementById('toast-container');if(!c)return;
+        const icons={success:'<i class="fas fa-check-circle"></i>',error:'<i class="fas fa-times-circle"></i>',warning:'<i class="fas fa-exclamation-triangle"></i>',info:'<i class="fas fa-info-circle"></i>'};
+        const toast=document.createElement('div');toast.className=`toast ${t}`;toast.innerHTML=`${icons[t]||icons.info} ${m}`;
+        c.appendChild(toast);setTimeout(()=>toast.remove(),3000);
     }
 
-    setElementText(id, text) {
-        const el = document.getElementById(id);
-        if (el) el.textContent = text;
-    }
-
-    /* ==================== TOASTS ==================== */
-    showToast(message, type = 'info') {
-        const container = document.getElementById('toast-container');
-        if (!container) return;
-
-        const icons = {
-            success: '<i class="fas fa-check-circle"></i>',
-            error: '<i class="fas fa-times-circle"></i>',
-            warning: '<i class="fas fa-exclamation-triangle"></i>',
-            info: '<i class="fas fa-info-circle"></i>'
-        };
-
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.innerHTML = `${icons[type] || icons.info} ${message}`;
-        container.appendChild(toast);
-
-        setTimeout(() => toast.remove(), 3000);
-    }
-
-    /* ==================== UTILITAIRES ==================== */
-    formatTime(timestamp) {
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffSec = Math.floor((now - date) / 1000);
-        const diffMin = Math.floor(diffSec / 60);
-        const diffHour = Math.floor(diffMin / 60);
-        const diffDay = Math.floor(diffHour / 24);
-
-        if (diffSec < 10) return 'À l\'instant';
-        if (diffSec < 60) return `Il y a ${diffSec}s`;
-        if (diffMin < 60) return `Il y a ${diffMin}min`;
-        if (diffHour < 24) return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        if (diffDay < 7) return `Il y a ${diffDay}j`;
-        return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-    }
+    formatTime(ts){const d=new Date(ts),n=new Date(),s=Math.floor((n-d)/1000),mn=Math.floor(s/60),h=Math.floor(mn/60),j=Math.floor(h/24);if(s<10)return'À l\'instant';if(s<60)return`Il y a ${s}s`;if(mn<60)return`Il y a ${mn}min`;if(h<24)return d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});if(j<7)return`Il y a ${j}j`;return d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});}
 }
 
-/* ==================== INITIALISATION ==================== */
 const app = new SmartHomeApp();
-console.log('✅ Smart Home prêt !');
-console.log('💡 Conseil : Ctrl+P pour simuler la proximité');
-console.log('📹 Caméras : Configurer > Utiliser caméra téléphone');
+console.log('✅ Smart Home Pro prêt !');

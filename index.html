@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Smart Home - Contrôle Local</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Smart Home Pro - Surveillance & Contrôle</title>
+    <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="manifest" href="data:application/json,{}">
     <meta name="theme-color" content="#0a0e17">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,8 +17,8 @@
         <div class="login-container">
             <div class="login-header">
                 <div class="login-logo">🏠</div>
-                <h1>JONCORP CONTROL</h1>
-                <p class="login-subtitle">Contrôle local sécurisé à proximité</p>
+                <h1>Smart Home Pro</h1>
+                <p class="login-subtitle">Contrôle local • Caméras • Surveillance</p>
             </div>
             
             <div class="login-error" id="login-error"></div>
@@ -42,8 +41,7 @@
             </form>
             
             <p class="login-hint">
-                <i class="fas fa-info-circle"></i>
-               
+                <i class="fas fa-info-circle"></i> Démo : admin / admin123
             </p>
         </div>
     </div>
@@ -93,132 +91,88 @@
         <!-- Navigation par onglets -->
         <nav class="tab-nav">
             <button class="tab-button active" data-tab="dashboard">
-                <i class="fas fa-th-large"></i>
-                <span>Dashboard</span>
+                <i class="fas fa-th-large"></i><span>Dashboard</span>
             </button>
             <button class="tab-button" data-tab="devices">
-                <i class="fas fa-door-open"></i>
-                <span>Portes & Fenêtres</span>
+                <i class="fas fa-door-open"></i><span>Portes & Fenêtres</span>
             </button>
             <button class="tab-button" data-tab="lights">
-                <i class="fas fa-lightbulb"></i>
-                <span>Lumières</span>
+                <i class="fas fa-lightbulb"></i><span>Lumières</span>
             </button>
             <button class="tab-button" data-tab="cameras">
-                <i class="fas fa-video"></i>
-                <span>Caméras</span>
+                <i class="fas fa-video"></i><span>Caméras</span>
+            </button>
+            <button class="tab-button" data-tab="recordings">
+                <i class="fas fa-film"></i><span>Enregistrements</span>
             </button>
             <button class="tab-button" data-tab="activity">
-                <i class="fas fa-history"></i>
-                <span>Activité</span>
+                <i class="fas fa-history"></i><span>Activité</span>
             </button>
         </nav>
 
         <!-- Contenu des onglets -->
         <div class="tab-content-wrapper">
             
-            <!-- Onglet Dashboard -->
+            <!-- Dashboard -->
             <div class="tab-panel active" id="panel-dashboard">
                 <div class="dashboard-summary">
-                    <div class="summary-card">
-                        <i class="fas fa-door-open"></i>
-                        <div>
-                            <span class="summary-value" id="summary-doors">0/0</span>
-                            <span class="summary-label">Portes ouvertes</span>
-                        </div>
-                    </div>
-                    <div class="summary-card">
-                        <i class="fas fa-lightbulb"></i>
-                        <div>
-                            <span class="summary-value" id="summary-lights">0/0</span>
-                            <span class="summary-label">Lumières allumées</span>
-                        </div>
-                    </div>
-                    <div class="summary-card">
-                        <i class="fas fa-video"></i>
-                        <div>
-                            <span class="summary-value" id="summary-cameras">0</span>
-                            <span class="summary-label">Caméras actives</span>
-                        </div>
-                    </div>
-                    <div class="summary-card">
-                        <i class="fas fa-window-maximize"></i>
-                        <div>
-                            <span class="summary-value" id="summary-windows">0/0</span>
-                            <span class="summary-label">Fenêtres ouvertes</span>
-                        </div>
-                    </div>
+                    <div class="summary-card"><i class="fas fa-door-open"></i><div><span class="summary-value" id="summary-doors">0/0</span><span class="summary-label">Portes ouvertes</span></div></div>
+                    <div class="summary-card"><i class="fas fa-lightbulb"></i><div><span class="summary-value" id="summary-lights">0/0</span><span class="summary-label">Lumières allumées</span></div></div>
+                    <div class="summary-card"><i class="fas fa-video"></i><div><span class="summary-value" id="summary-cameras">0</span><span class="summary-label">Caméras actives</span></div></div>
+                    <div class="summary-card"><i class="fas fa-window-maximize"></i><div><span class="summary-value" id="summary-windows">0/0</span><span class="summary-label">Fenêtres ouvertes</span></div></div>
                 </div>
-                
-                <h3 class="section-title">
-                    <i class="fas fa-star"></i> Accès rapide
-                </h3>
+                <h3 class="section-title"><i class="fas fa-star"></i> Accès rapide</h3>
                 <div class="device-grid" id="quick-access-grid"></div>
-                
-                <h3 class="section-title">
-                    <i class="fas fa-clock"></i> Activité récente
-                </h3>
+                <h3 class="section-title"><i class="fas fa-clock"></i> Activité récente</h3>
                 <div class="activity-list" id="recent-activity"></div>
             </div>
 
-            <!-- Onglet Portes & Fenêtres -->
+            <!-- Portes & Fenêtres -->
             <div class="tab-panel" id="panel-devices">
                 <div class="panel-header">
-                    <h3 class="section-title">
-                        <i class="fas fa-door-open"></i> Portes & Fenêtres
-                    </h3>
+                    <h3 class="section-title"><i class="fas fa-door-open"></i> Portes & Fenêtres</h3>
                     <div class="panel-actions">
-                        <button class="btn btn-primary btn-sm" onclick="app.openAddDeviceModal()">
-                            <i class="fas fa-plus"></i> Ajouter
-                        </button>
-                        <button class="btn btn-outline btn-sm" onclick="app.closeAllDoorsWindows()">
-                            <i class="fas fa-lock"></i> Tout fermer
-                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="app.openAddDeviceModal()"><i class="fas fa-plus"></i> Ajouter</button>
+                        <button class="btn btn-outline btn-sm" onclick="app.closeAllDoorsWindows()"><i class="fas fa-lock"></i> Tout fermer</button>
                     </div>
                 </div>
                 <div class="device-grid" id="doors-windows-grid"></div>
             </div>
 
-            <!-- Onglet Lumières -->
+            <!-- Lumières -->
             <div class="tab-panel" id="panel-lights">
                 <div class="panel-header">
-                    <h3 class="section-title">
-                        <i class="fas fa-lightbulb"></i> Lumières
-                    </h3>
+                    <h3 class="section-title"><i class="fas fa-lightbulb"></i> Lumières</h3>
                     <div class="panel-actions">
-                        <button class="btn btn-primary btn-sm" onclick="app.openAddDeviceModal()">
-                            <i class="fas fa-plus"></i> Ajouter
-                        </button>
-                        <button class="btn btn-outline btn-sm" id="btn-all-lights" onclick="app.toggleAllLights()">
-                            <i class="fas fa-power-off"></i> Tout éteindre
-                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="app.openAddDeviceModal()"><i class="fas fa-plus"></i> Ajouter</button>
+                        <button class="btn btn-outline btn-sm" id="btn-all-lights" onclick="app.toggleAllLights()"><i class="fas fa-power-off"></i> Tout éteindre</button>
                     </div>
                 </div>
                 <div class="device-grid" id="lights-grid"></div>
             </div>
 
-            <!-- Onglet Caméras -->
+            <!-- Caméras -->
             <div class="tab-panel" id="panel-cameras">
                 <div class="panel-header">
-                    <h3 class="section-title">
-                        <i class="fas fa-video"></i> Caméras de surveillance
-                    </h3>
-                    <button class="btn btn-primary btn-sm" onclick="app.openAddDeviceModal()">
-                        <i class="fas fa-plus"></i> Ajouter
-                    </button>
+                    <h3 class="section-title"><i class="fas fa-video"></i> Caméras de surveillance</h3>
+                    <button class="btn btn-primary btn-sm" onclick="app.openAddDeviceModal()"><i class="fas fa-plus"></i> Ajouter</button>
                 </div>
                 <div class="device-grid" id="cameras-grid"></div>
             </div>
 
-            <!-- Onglet Activité -->
+            <!-- Enregistrements -->
+            <div class="tab-panel" id="panel-recordings">
+                <h3 class="section-title"><i class="fas fa-film"></i> Enregistrements vidéo</h3>
+                <div id="all-recordings-container"></div>
+            </div>
+
+            <!-- Activité -->
             <div class="tab-panel" id="panel-activity">
-                <h3 class="section-title">
-                    <i class="fas fa-history"></i> Historique complet
-                </h3>
+                <div class="panel-header">
+                    <h3 class="section-title"><i class="fas fa-history"></i> Historique complet</h3>
+                    <button class="btn btn-outline btn-sm" onclick="app.clearActivity()"><i class="fas fa-trash"></i> Effacer</button>
+                </div>
                 <div class="activity-list" id="full-activity"></div>
-                <button class="btn btn-outline btn-sm" style="margin-top:15px;" onclick="app.clearActivity()">
-                    <i class="fas fa-trash"></i> Effacer l'historique
-                </button>
             </div>
         </div>
     </div>
@@ -231,41 +185,14 @@
                 <button class="modal-close" onclick="app.closeAddDeviceModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="input-group">
-                    <label>Nom de l'appareil</label>
-                    <i class="fas fa-tag"></i>
-                    <input type="text" id="new-device-name" placeholder="Ex: Porte Garage, Lampe Bureau...">
-                </div>
-                
-                <div class="input-group">
-                    <label>Type d'appareil</label>
-                    <i class="fas fa-list"></i>
-                    <select id="new-device-type" onchange="app.onDeviceTypeChange()">
-                        <option value="door">🚪 Porte</option>
-                        <option value="window">🪟 Fenêtre</option>
-                        <option value="light">💡 Lumière</option>
-                        <option value="camera">📹 Caméra</option>
-                    </select>
-                </div>
-                
-                <div class="input-group">
-                    <label>Pièce / Emplacement</label>
-                    <i class="fas fa-map-marker-alt"></i>
-                    <input type="text" id="new-device-room" placeholder="Ex: Salon, Cuisine, Entrée...">
-                </div>
-
-                <div class="input-group" id="camera-url-group" style="display:none;">
-                    <label>URL du flux caméra (optionnel)</label>
-                    <i class="fas fa-link"></i>
-                    <input type="text" id="new-camera-url" placeholder="http://192.168.1.100:81/stream">
-                    <small>Laissez vide pour utiliser la caméra du téléphone</small>
-                </div>
+                <div class="input-group"><label>Nom</label><i class="fas fa-tag"></i><input type="text" id="new-device-name" placeholder="Ex: Porte Garage"></div>
+                <div class="input-group"><label>Type</label><i class="fas fa-list"></i><select id="new-device-type" onchange="app.onDeviceTypeChange()"><option value="door">🚪 Porte</option><option value="window">🪟 Fenêtre</option><option value="light">💡 Lumière</option><option value="camera">📹 Caméra</option></select></div>
+                <div class="input-group"><label>Pièce</label><i class="fas fa-map-marker-alt"></i><input type="text" id="new-device-room" placeholder="Ex: Salon"></div>
+                <div class="input-group" id="camera-url-group" style="display:none;"><label>URL caméra (optionnel)</label><i class="fas fa-link"></i><input type="text" id="new-camera-url" placeholder="http://192.168.1.100:81/stream"><small>Laisser vide pour utiliser la caméra du téléphone</small></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="app.closeAddDeviceModal()">Annuler</button>
-                <button class="btn btn-primary" onclick="app.addDevice()">
-                    <i class="fas fa-check"></i> Ajouter
-                </button>
+                <button class="btn btn-primary" onclick="app.addDevice()"><i class="fas fa-check"></i> Ajouter</button>
             </div>
         </div>
     </div>
@@ -278,29 +205,20 @@
                 <button class="modal-close" onclick="app.closeConfigCameraModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="input-group">
-                    <label>URL du flux vidéo</label>
-                    <i class="fas fa-link"></i>
-                    <input type="text" id="config-camera-url" placeholder="http://192.168.1.100:81/stream">
-                </div>
+                <div class="input-group"><label>URL du flux vidéo</label><i class="fas fa-link"></i><input type="text" id="config-camera-url" placeholder="http://192.168.1.100:81/stream"></div>
                 <div class="camera-options">
                     <p><strong>Formats supportés :</strong></p>
                     <ul>
                         <li>ESP32-CAM : http://[IP]:81/stream</li>
                         <li>Caméra IP : http://[IP]:8080/video</li>
-                        <li>Raspberry Pi : http://[IP]:8000/stream.mjpg</li>
-                        <li>Image statique : http://[IP]/snapshot.jpg</li>
+                        <li>RPi : http://[IP]:8000/stream.mjpg</li>
                     </ul>
                 </div>
-                <button class="btn btn-outline btn-sm" onclick="app.usePhoneCamera()">
-                    <i class="fas fa-mobile-alt"></i> Utiliser la caméra du téléphone
-                </button>
+                <button class="btn btn-outline btn-sm btn-full" onclick="app.usePhoneCamera()"><i class="fas fa-mobile-alt"></i> Utiliser la caméra du téléphone</button>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="app.closeConfigCameraModal()">Annuler</button>
-                <button class="btn btn-primary" onclick="app.saveCameraConfig()">
-                    <i class="fas fa-save"></i> Enregistrer
-                </button>
+                <button class="btn btn-primary" onclick="app.saveCameraConfig()"><i class="fas fa-save"></i> Enregistrer</button>
             </div>
         </div>
     </div>
@@ -310,23 +228,20 @@
         <div class="notification-panel-header">
             <h3><i class="fas fa-bell"></i> Notifications</h3>
             <div>
-                <button class="btn btn-outline btn-sm" onclick="app.clearNotifications()">
-                    <i class="fas fa-check-double"></i> Tout lu
-                </button>
-                <button class="icon-button" onclick="app.toggleNotificationPanel()">
-                    <i class="fas fa-times"></i>
-                </button>
+                <button class="btn btn-outline btn-sm" onclick="app.clearNotifications()"><i class="fas fa-check-double"></i> Tout lu</button>
+                <button class="icon-button" onclick="app.toggleNotificationPanel()"><i class="fas fa-times"></i></button>
             </div>
         </div>
         <div class="notification-list" id="notification-list"></div>
     </div>
 
-    <!-- ==================== CONTENEUR DE TOASTS ==================== -->
-    <div class="toast-container" id="toast-container"></div>
-
-    <!-- ==================== OVERLAY POUR MOBILE ==================== -->
+    <!-- Overlay mobile -->
     <div class="panel-overlay" id="panel-overlay" onclick="app.toggleNotificationPanel()"></div>
 
-    <script src="script.js"></script>
+    <!-- Conteneur de toasts -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="js/video-recorder.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>JONCORP CONTROL</title>
+    <title>Smart Home Pro - Domotique Complète</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <meta name="theme-color" content="#0a0e17">
@@ -12,37 +12,74 @@
 </head>
 <body>
 
-    <!-- ==================== ÉCRAN DE CONNEXION ==================== -->
+    <!-- ==================== ÉCRAN DE CONNEXION/INSCRIPTION ==================== -->
     <div id="login-screen" class="screen active">
         <div class="login-container">
             <div class="login-header">
                 <div class="login-logo">🏠</div>
-                <h1>JONCORP CONTROL </h1>
+                <h1>Smart Home Pro</h1>
                 <p class="login-subtitle">Contrôle local • Caméras • Surveillance</p>
             </div>
             
-            <div class="login-error" id="login-error"></div>
+            <!-- Onglets Connexion/Inscription -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="app.switchAuthTab('login')">
+                    <i class="fas fa-sign-in-alt"></i> Connexion
+                </button>
+                <button class="auth-tab" onclick="app.switchAuthTab('register')">
+                    <i class="fas fa-user-plus"></i> Créer un compte
+                </button>
+            </div>
             
-            <form id="login-form" class="login-form" autocomplete="off">
+            <div class="login-error" id="login-error"></div>
+            <div class="login-success" id="login-success"></div>
+            
+            <!-- Formulaire de connexion -->
+            <form id="login-form" class="auth-form active" autocomplete="off">
                 <div class="input-group">
                     <i class="fas fa-user"></i>
-                    <input type="text" id="login-username" placeholder="Nom d'utilisateur" required autocomplete="off">
+                    <input type="text" id="login-username" placeholder="Nom d'utilisateur ou email" required autocomplete="username">
                 </div>
-                
                 <div class="input-group">
                     <i class="fas fa-lock"></i>
-                    <input type="password" id="login-password" placeholder="Mot de passe" required autocomplete="off">
+                    <input type="password" id="login-password" placeholder="Mot de passe" required autocomplete="current-password">
                 </div>
-                
+                <div class="remember-me">
+                    <label><input type="checkbox" id="remember-me"> Se souvenir de moi</label>
+                </div>
                 <button type="submit" class="btn btn-primary btn-login">
-                    <i class="fas fa-sign-in-alt"></i>
-                    <span>Se connecter</span>
+                    <i class="fas fa-sign-in-alt"></i><span>Se connecter</span>
                 </button>
             </form>
             
-            <p class="login-hint">
-                <i class="fas fa-info-circle"></i> Démo : 
-            </p>
+            <!-- Formulaire d'inscription -->
+            <form id="register-form" class="auth-form" autocomplete="off">
+                <div class="input-group">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="reg-username" placeholder="Nom d'utilisateur (3+ caractères)" required autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" id="reg-email" placeholder="Adresse email" required autocomplete="email">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="reg-password" placeholder="Mot de passe (6+ caractères)" required autocomplete="new-password" minlength="6">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="reg-confirm-password" placeholder="Confirmer le mot de passe" required autocomplete="new-password">
+                </div>
+                <div class="password-strength" id="password-strength">
+                    <div class="strength-bar"><div class="strength-fill" id="strength-fill"></div></div>
+                    <span class="strength-text" id="strength-text">Force du mot de passe</span>
+                </div>
+                <button type="submit" class="btn btn-primary btn-login">
+                    <i class="fas fa-user-plus"></i><span>Créer mon compte</span>
+                </button>
+            </form>
+            
+            <p class="login-hint"><i class="fas fa-shield-alt"></i> Identifiants chiffrés et stockés localement</p>
         </div>
     </div>
 
@@ -62,15 +99,12 @@
                     </span>
                 </div>
             </div>
-            
             <div class="topbar-actions">
+                <button class="icon-button" onclick="app.openProfileModal()" title="Profil"><i class="fas fa-user-cog"></i></button>
                 <button class="icon-button" id="notif-button" onclick="app.toggleNotificationPanel()" title="Notifications">
-                    <i class="fas fa-bell"></i>
-                    <span class="notification-badge" id="notification-badge">0</span>
+                    <i class="fas fa-bell"></i><span class="notification-badge" id="notification-badge">0</span>
                 </button>
-                <button class="icon-button" onclick="app.logout()" title="Déconnexion">
-                    <i class="fas fa-sign-out-alt"></i>
-                </button>
+                <button class="icon-button" onclick="app.logout()" title="Déconnexion"><i class="fas fa-sign-out-alt"></i></button>
             </div>
         </header>
 
@@ -78,41 +112,22 @@
         <div class="proximity-alert" id="proximity-alert">
             <div class="proximity-alert-content">
                 <i class="fas fa-map-marker-alt"></i>
-                <div>
-                    <strong>Accès restreint</strong>
-                    <p>Vous devez être à moins de 2 mètres de la maison pour contrôler les appareils</p>
-                </div>
-                <button class="btn btn-sm btn-outline" onclick="app.simulateProximity()" title="Pour tester sans GPS">
-                    <i class="fas fa-flask"></i> Simuler
-                </button>
+                <div><strong>Accès restreint</strong><p>Vous devez être à moins de 2 mètres pour contrôler les appareils</p></div>
+                <button class="btn btn-sm btn-outline" onclick="app.simulateProximity()"><i class="fas fa-flask"></i> Simuler</button>
             </div>
         </div>
 
         <!-- Navigation par onglets -->
         <nav class="tab-nav">
-            <button class="tab-button active" data-tab="dashboard">
-                <i class="fas fa-th-large"></i><span>Dashboard</span>
-            </button>
-            <button class="tab-button" data-tab="devices">
-                <i class="fas fa-door-open"></i><span>Portes & Fenêtres</span>
-            </button>
-            <button class="tab-button" data-tab="lights">
-                <i class="fas fa-lightbulb"></i><span>Lumières</span>
-            </button>
-            <button class="tab-button" data-tab="cameras">
-                <i class="fas fa-video"></i><span>Caméras</span>
-            </button>
-            <button class="tab-button" data-tab="recordings">
-                <i class="fas fa-film"></i><span>Enregistrements</span>
-            </button>
-            <button class="tab-button" data-tab="activity">
-                <i class="fas fa-history"></i><span>Activité</span>
-            </button>
+            <button class="tab-button active" data-tab="dashboard"><i class="fas fa-th-large"></i><span>Dashboard</span></button>
+            <button class="tab-button" data-tab="devices"><i class="fas fa-door-open"></i><span>Portes & Fenêtres</span></button>
+            <button class="tab-button" data-tab="lights"><i class="fas fa-lightbulb"></i><span>Lumières</span></button>
+            <button class="tab-button" data-tab="cameras"><i class="fas fa-video"></i><span>Caméras</span></button>
+            <button class="tab-button" data-tab="recordings"><i class="fas fa-film"></i><span>Enregistrements</span></button>
+            <button class="tab-button" data-tab="activity"><i class="fas fa-history"></i><span>Activité</span></button>
         </nav>
 
-        <!-- Contenu des onglets -->
         <div class="tab-content-wrapper">
-            
             <!-- Dashboard -->
             <div class="tab-panel active" id="panel-dashboard">
                 <div class="dashboard-summary">
@@ -177,71 +192,67 @@
         </div>
     </div>
 
-    <!-- ==================== MODAL AJOUTER APPAREIL ==================== -->
+    <!-- ==================== MODALS ==================== -->
+    
+    <!-- Modal Ajouter Appareil -->
     <div class="modal-overlay" id="modal-add-device">
         <div class="modal">
-            <div class="modal-header">
-                <h2><i class="fas fa-plus-circle"></i> Ajouter un appareil</h2>
-                <button class="modal-close" onclick="app.closeAddDeviceModal()">&times;</button>
-            </div>
+            <div class="modal-header"><h2><i class="fas fa-plus-circle"></i> Ajouter un appareil</h2><button class="modal-close" onclick="app.closeAddDeviceModal()">&times;</button></div>
             <div class="modal-body">
                 <div class="input-group"><label>Nom</label><i class="fas fa-tag"></i><input type="text" id="new-device-name" placeholder="Ex: Porte Garage"></div>
                 <div class="input-group"><label>Type</label><i class="fas fa-list"></i><select id="new-device-type" onchange="app.onDeviceTypeChange()"><option value="door">🚪 Porte</option><option value="window">🪟 Fenêtre</option><option value="light">💡 Lumière</option><option value="camera">📹 Caméra</option></select></div>
                 <div class="input-group"><label>Pièce</label><i class="fas fa-map-marker-alt"></i><input type="text" id="new-device-room" placeholder="Ex: Salon"></div>
                 <div class="input-group" id="camera-url-group" style="display:none;"><label>URL caméra (optionnel)</label><i class="fas fa-link"></i><input type="text" id="new-camera-url" placeholder="http://192.168.1.100:81/stream"><small>Laisser vide pour utiliser la caméra du téléphone</small></div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="app.closeAddDeviceModal()">Annuler</button>
-                <button class="btn btn-primary" onclick="app.addDevice()"><i class="fas fa-check"></i> Ajouter</button>
-            </div>
+            <div class="modal-footer"><button class="btn btn-outline" onclick="app.closeAddDeviceModal()">Annuler</button><button class="btn btn-primary" onclick="app.addDevice()"><i class="fas fa-check"></i> Ajouter</button></div>
         </div>
     </div>
 
-    <!-- ==================== MODAL CONFIGURER CAMÉRA ==================== -->
+    <!-- Modal Configurer Caméra -->
     <div class="modal-overlay" id="modal-config-camera">
         <div class="modal">
-            <div class="modal-header">
-                <h2><i class="fas fa-cog"></i> Configurer la caméra</h2>
-                <button class="modal-close" onclick="app.closeConfigCameraModal()">&times;</button>
-            </div>
+            <div class="modal-header"><h2><i class="fas fa-cog"></i> Configurer la caméra</h2><button class="modal-close" onclick="app.closeConfigCameraModal()">&times;</button></div>
             <div class="modal-body">
                 <div class="input-group"><label>URL du flux vidéo</label><i class="fas fa-link"></i><input type="text" id="config-camera-url" placeholder="http://192.168.1.100:81/stream"></div>
-                <div class="camera-options">
-                    <p><strong>Formats supportés :</strong></p>
-                    <ul>
-                        <li>ESP32-CAM : http://[IP]:81/stream</li>
-                        <li>Caméra IP : http://[IP]:8080/video</li>
-                        <li>RPi : http://[IP]:8000/stream.mjpg</li>
-                    </ul>
-                </div>
+                <div class="camera-options"><p><strong>Formats supportés :</strong></p><ul><li>ESP32-CAM : http://[IP]:81/stream</li><li>Caméra IP : http://[IP]:8080/video</li><li>RPi : http://[IP]:8000/stream.mjpg</li></ul></div>
                 <button class="btn btn-outline btn-sm btn-full" onclick="app.usePhoneCamera()"><i class="fas fa-mobile-alt"></i> Utiliser la caméra du téléphone</button>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="app.closeConfigCameraModal()">Annuler</button>
-                <button class="btn btn-primary" onclick="app.saveCameraConfig()"><i class="fas fa-save"></i> Enregistrer</button>
-            </div>
+            <div class="modal-footer"><button class="btn btn-outline" onclick="app.closeConfigCameraModal()">Annuler</button><button class="btn btn-primary" onclick="app.saveCameraConfig()"><i class="fas fa-save"></i> Enregistrer</button></div>
         </div>
     </div>
 
-    <!-- ==================== PANNEAU DE NOTIFICATIONS ==================== -->
+    <!-- Modal Profil Utilisateur -->
+    <div class="modal-overlay" id="modal-profile">
+        <div class="modal">
+            <div class="modal-header"><h2><i class="fas fa-user-circle"></i> Mon Profil</h2><button class="modal-close" onclick="app.closeProfileModal()">&times;</button></div>
+            <div class="modal-body">
+                <div class="profile-info">
+                    <div class="profile-avatar" id="profile-avatar">A</div>
+                    <div class="profile-details"><h3 id="profile-name">Admin</h3><p id="profile-email">admin@smarthome.local</p><p id="profile-date">Membre depuis le 01/01/2024</p></div>
+                </div>
+                <hr style="border-color:var(--border);margin:20px 0;">
+                <h4 style="margin-bottom:15px;">Changer le mot de passe</h4>
+                <div class="input-group"><i class="fas fa-lock"></i><input type="password" id="current-password" placeholder="Mot de passe actuel"></div>
+                <div class="input-group"><i class="fas fa-lock"></i><input type="password" id="new-password" placeholder="Nouveau mot de passe"></div>
+                <div class="input-group"><i class="fas fa-lock"></i><input type="password" id="confirm-new-password" placeholder="Confirmer"></div>
+                <button class="btn btn-primary btn-full" onclick="app.changePassword()"><i class="fas fa-save"></i> Mettre à jour</button>
+            </div>
+            <div class="modal-footer"><button class="btn btn-outline" onclick="app.closeProfileModal()">Fermer</button><button class="btn btn-danger" onclick="app.deleteAccount()"><i class="fas fa-trash"></i> Supprimer mon compte</button></div>
+        </div>
+    </div>
+
+    <!-- Panneau Notifications -->
     <div class="notification-panel" id="notification-panel">
         <div class="notification-panel-header">
             <h3><i class="fas fa-bell"></i> Notifications</h3>
-            <div>
-                <button class="btn btn-outline btn-sm" onclick="app.clearNotifications()"><i class="fas fa-check-double"></i> Tout lu</button>
-                <button class="icon-button" onclick="app.toggleNotificationPanel()"><i class="fas fa-times"></i></button>
-            </div>
+            <div><button class="btn btn-outline btn-sm" onclick="app.clearNotifications()"><i class="fas fa-check-double"></i> Tout lu</button><button class="icon-button" onclick="app.toggleNotificationPanel()"><i class="fas fa-times"></i></button></div>
         </div>
         <div class="notification-list" id="notification-list"></div>
     </div>
 
-    <!-- Overlay mobile -->
     <div class="panel-overlay" id="panel-overlay" onclick="app.toggleNotificationPanel()"></div>
-
-    <!-- Conteneur de toasts -->
     <div class="toast-container" id="toast-container"></div>
 
-    <script src="video.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
